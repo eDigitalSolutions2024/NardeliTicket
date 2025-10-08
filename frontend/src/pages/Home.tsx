@@ -2,9 +2,7 @@ import React from "react";
 import SimpleCarousel, { type Slide } from "../components/SimpleCarousel";
 import EventCard, { type EventItem } from "../components/EventCard";
 
-// Si no tienes alias "@", importa con rutas relativas:
-// import SimpleCarousel, { Slide } from "../components/SimpleCarousel";
-// import EventCard, { EventItem } from "../components/EventCard";
+
 
 const slides: Slide[] = [
   {

@@ -1,23 +1,25 @@
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
-import Home from "./pages/Home";
-//import EventDetail from "./pages/EventDetail";
-//import Cart from "./pages/Cart";
-//import AdminDashboard from "./pages/AdminDashboard";
+// src/App.tsx
+import { BrowserRouter as Router, Routes, Route, Link, Navigate } from "react-router-dom";
+import AdminDashboard from "./pages/AdminDashboard";
 
 export default function App() {
   return (
     <Router>
-      <nav style={{ padding: "10px", background: "#222", color: "#fff" }}>
-        <Link to="/" style={{ marginRight: 10, color: "#fff" }}>Inicio</Link>
-        <Link to="/cart" style={{ marginRight: 10, color: "#fff" }}>Carrito</Link>
-        <Link to="/admin" style={{ color: "#fff" }}>Admin</Link>
-      </nav>
+      <header style={{ background: "#222", padding: "10px" }}>
+        <nav>
+          <Link to="/admin" style={{ color: "#fff", fontWeight: 700 }}>
+            Admin
+          </Link>
+        </nav>
+      </header>
 
       <Routes>
-        <Route path="/" element={<Home />} />
-        {/*<Route path="/evento/:id" element={<EventDetail />} />
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/admin" element={<AdminDashboard />} />*/}
+        {/* Redirige la raíz a /admin */}
+        <Route path="/" element={<Navigate to="/admin" replace />} />
+        {/* Única página activa */}
+        <Route path="/admin" element={<AdminDashboard />} />
+        {/* Cualquier otra ruta también va a /admin */}
+        <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
     </Router>
   );

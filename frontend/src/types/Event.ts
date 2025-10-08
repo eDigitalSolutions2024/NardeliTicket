@@ -1,0 +1,13 @@
+export interface EventSession {
+  id?: string;
+  date: string; // ISO
+}
+export interface EventItem {
+  id: string;
+  title: string;
+  venue: string;
+  city: string;
+  imageUrl: string;
+  category?: "Conciertos" | "Teatro" | "Deportes" | "Familiares" | "Especiales";
+  sessions: EventSession[];
+}

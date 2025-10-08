@@ -66,3 +66,30 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+
+
+.admin-form .grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+}
+.admin-form label { display: grid; gap: 6px; font-size: 14px; }
+.admin-form input, .admin-form select {
+  height: 40px; border: 1px solid #d5dcef; border-radius: 10px; padding: 0 12px;
+}
+.sessions { margin-top: 12px; display: grid; gap: 8px; }
+.sessions-add { display: grid; grid-template-columns: 240px 140px; gap: 8px; }
+.sessions-add button { height: 40px; border-radius: 10px; border: 0; background: #0a5cff; color: #fff; font-weight: 700; }
+.sessions-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.sessions-list li { display: flex; align-items: center; justify-content: space-between; background: #f5f7ff; padding: 8px 10px; border-radius: 8px; }
+.sessions-list button { border: 0; background: #e53e3e; color: #fff; border-radius: 8px; padding: 6px 10px; }
+
+.form-actions { margin-top: 12px; display: flex; gap: 8px; }
+.form-actions button { height: 40px; border-radius: 10px; border: 0; background: #0a5cff; color: #fff; font-weight: 700; padding: 0 14px; }
+.form-actions .btn-secondary { background: #64748b; }
+
+.admin-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+.admin-table th, .admin-table td { border-bottom: 1px solid #e6e8ef; padding: 8px; font-size: 14px; }
+.admin-table th { text-align: left; color: #475569; font-weight: 600; }
+.btn-danger { background: #e53e3e; color: #fff; border: 0; border-radius: 8px; padding: 8px 10px; }
+

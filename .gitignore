@@ -1,0 +1,77 @@
+# --- Node / Monorepo ---
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+# (si prefieres commitear el lockfile, quita esta línea)
+
+# --- Builds / Caches ---
+dist/
+**/dist/
+build/
+**/build/
+.vite/
+**/.vite/
+.vite-deps/
+.eslintcache
+.turbo/
+.cache/
+.parcel-cache/
+.tmp/
+temp/
+tmp/
+coverage/
+nyc_output/
+jest-html-reporters-*
+playwright-report/
+test-results/
+
+# --- TypeScript ---
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# --- Env / Secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Logs / PIDs ---
+logs/
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# --- IDE / OS ---
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- OneDrive (a veces genera temporales) ---
+*.tmp
+*.temp
+~$*
+.onedrive/
+*.one
+
+# --- Docker ---
+.docker/
+docker-data/
+
+# --- App data comunes ---
+uploads/
+storage/
+public/uploads/
+frontend/public/assets/generated/
+backend/uploads/
+
+# --- Misc front-end ---
+*.local
+.sass-cache/
+*.map

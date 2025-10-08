@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { createEvent, deleteEvent, fetchEvents, updateEvent } from "../api/events";
-import type { EventItem, EventSession } from "../types/Event";
+import type { EventItem, EventSession, EventStatus } from "../types/Event";
 
 type FormState = Omit<EventItem, "id"> & { id?: string };
-
 const emptyForm: FormState = {
-  title: "",
-  venue: "",
-  city: "",
-  imageUrl: "",
-  category: undefined,
-  sessions: [],
+  title: "", venue: "", city: "", imageUrl: "",
+  category: undefined, sessions: [], status: "draft", featured: false,
 };
 
 export default function AdminDashboard() {
@@ -18,8 +13,10 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [q, setQ] = useState("");
   const isEditing = useMemo(() => !!form.id, [form.id]);
 
+  useEffect(() => { load(); }, []);
   async function load() {
     setLoading(true);
     const data = await fetchEvents();
@@ -27,20 +24,15 @@ export default function AdminDashboard() {
     setLoading(false);
   }
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  function updateField<K extends keyof FormState>(key: K, val: FormState[K]) {
-    setForm((f) => ({ ...f, [key]: val }));
+  function setField<K extends keyof FormState>(k: K, v: FormState[K]) {
+    setForm((f) => ({ ...f, [k]: v }));
   }
-
   function addSession(dateISO: string) {
     if (!dateISO) return;
-    updateField("sessions", [...form.sessions, { date: dateISO } as EventSession]);
+    setField("sessions", [...form.sessions, { date: dateISO }]);
   }
-  function removeSession(idx: number) {
-    updateField("sessions", form.sessions.filter((_, i) => i !== idx));
+  function removeSession(i: number) {
+    setField("sessions", form.sessions.filter((_, idx) => idx !== i));
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -59,6 +51,7 @@ export default function AdminDashboard() {
         setEvents((list) => [saved, ...list]);
       }
       setForm(emptyForm);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       console.error(err);
       alert("Error al guardar el evento.");
@@ -69,17 +62,12 @@ export default function AdminDashboard() {
 
   function onEdit(ev: EventItem) {
     setForm({
-      id: ev.id,
-      title: ev.title,
-      venue: ev.venue,
-      city: ev.city,
-      imageUrl: ev.imageUrl,
-      category: ev.category,
-      sessions: ev.sessions ?? [],
+      id: ev.id, title: ev.title, venue: ev.venue, city: ev.city, imageUrl: ev.imageUrl,
+      category: ev.category, sessions: ev.sessions ?? [], status: ev.status ?? "draft",
+      featured: Boolean(ev.featured),
     });
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
-
   async function onDelete(id: string) {
     if (!confirm("¿Eliminar este evento?")) return;
     try {
@@ -90,6 +78,36 @@ export default function AdminDashboard() {
       alert("No se pudo eliminar.");
     }
   }
+  async function togglePublish(ev: EventItem) {
+    try {
+      const next: EventStatus = ev.status === "published" ? "draft" : "published";
+      const saved = await updateEvent(ev.id, { status: next });
+      setEvents((list) => list.map((x) => (x.id === ev.id ? saved : x)));
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo cambiar el estado.");
+    }
+  }
+  async function toggleFeatured(ev: EventItem) {
+    try {
+      const saved = await updateEvent(ev.id, { featured: !ev.featured });
+      setEvents((list) => list.map((x) => (x.id === ev.id ? saved : x)));
+    } catch (e) {
+      console.error(e);
+      alert("No se pudo marcar como destacado.");
+    }
+  }
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return events;
+    return events.filter(
+      (e) =>
+        e.title.toLowerCase().includes(s) ||
+        e.venue.toLowerCase().includes(s) ||
+        e.city.toLowerCase().includes(s)
+    );
+  }, [events, q]);
 
   return (
     <div>
@@ -100,28 +118,23 @@ export default function AdminDashboard() {
         <div className="grid">
           <label>
             Título *
-            <input
-              value={form.title}
-              onChange={(e) => updateField("title", e.target.value)}
-              placeholder="Nombre del evento"
-              required
-            />
+            <input value={form.title} onChange={(e) => setField("title", e.target.value)} placeholder="Nombre del evento" required />
           </label>
           <label>
             Venue *
-            <input value={form.venue} onChange={(e) => updateField("venue", e.target.value)} placeholder="Ej. Autódromo" required />
+            <input value={form.venue} onChange={(e) => setField("venue", e.target.value)} placeholder="Ej. Autódromo" required />
           </label>
           <label>
             Ciudad *
-            <input value={form.city} onChange={(e) => updateField("city", e.target.value)} placeholder="CDMX / Monterrey / ..." required />
+            <input value={form.city} onChange={(e) => setField("city", e.target.value)} placeholder="CDMX / Monterrey / ..." required />
           </label>
           <label>
             Imagen (URL) *
-            <input value={form.imageUrl} onChange={(e) => updateField("imageUrl", e.target.value)} placeholder="https://..." required />
+            <input value={form.imageUrl} onChange={(e) => setField("imageUrl", e.target.value)} placeholder="https://..." required />
           </label>
           <label>
             Categoría
-            <select value={form.category ?? ""} onChange={(e) => updateField("category", (e.target.value || undefined) as any)}>
+            <select value={form.category ?? ""} onChange={(e) => setField("category", (e.target.value || undefined) as any)}>
               <option value="">(sin categoría)</option>
               <option>Conciertos</option>
               <option>Teatro</option>
@@ -130,7 +143,28 @@ export default function AdminDashboard() {
               <option>Especiales</option>
             </select>
           </label>
+          <label>
+            Estado
+            <select value={form.status ?? "draft"} onChange={(e) => setField("status", e.target.value as EventStatus)}>
+              <option value="draft">Borrador</option>
+              <option value="published">Publicado</option>
+            </select>
+          </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input type="checkbox" checked={!!form.featured} onChange={(e) => setField("featured", e.target.checked)} />
+            Destacado
+          </label>
         </div>
+
+        {/* Preview imagen */}
+        {form.imageUrl && (
+          <div style={{ marginTop: 8 }}>
+            <small>Preview:</small>
+            <div style={{ width: 320, height: 180, overflow: "hidden", borderRadius: 8, border: "1px solid #e6e8ef" }}>
+              <img src={form.imageUrl} alt="preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            </div>
+          </div>
+        )}
 
         {/* sesiones */}
         <div className="sessions">
@@ -148,16 +182,13 @@ export default function AdminDashboard() {
                 }
               }}
             />
-            <button
-              type="button"
-              onClick={() => {
-                const el = document.querySelector<HTMLInputElement>(".sessions-add input[type='datetime-local']");
-                if (el?.value) {
-                  addSession(new Date(el.value).toISOString());
-                  el.value = "";
-                }
-              }}
-            >
+            <button type="button" onClick={() => {
+              const el = document.querySelector<HTMLInputElement>(".sessions-add input[type='datetime-local']");
+              if (el?.value) {
+                addSession(new Date(el.value).toISOString());
+                el.value = "";
+              }
+            }}>
               Agregar fecha
             </button>
           </div>
@@ -176,14 +207,22 @@ export default function AdminDashboard() {
 
         <div className="form-actions">
           <button type="submit" disabled={saving}>{isEditing ? "Guardar cambios" : "Crear evento"}</button>
-          {isEditing && (
-            <button type="button" onClick={() => setForm(emptyForm)} className="btn-secondary">Cancelar</button>
-          )}
+          {isEditing && <button type="button" onClick={() => setForm(emptyForm)} className="btn-secondary">Cancelar</button>}
         </div>
       </form>
 
-      {/* LISTADO */}
-      <h2 style={{ marginTop: 24 }}>Eventos</h2>
+      {/* BUSCADOR */}
+      <div style={{ marginTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h2 style={{ margin: 0 }}>Eventos</h2>
+        <input
+          placeholder="Buscar por título / venue / ciudad..."
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          style={{ height: 36, borderRadius: 8, border: "1px solid #d5dcef", padding: "0 10px", minWidth: 280 }}
+        />
+      </div>
+
+      {/* LISTA */}
       {loading ? (
         <p>Cargando...</p>
       ) : (
@@ -195,11 +234,13 @@ export default function AdminDashboard() {
               <th>Venue</th>
               <th>Ciudad</th>
               <th>Próxima fecha</th>
+              <th>Estado</th>
+              <th>Dest.</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            {events.map((ev) => {
+            {filtered.map((ev) => {
               const next = ev.sessions?.[0]?.date ? new Date(ev.sessions[0].date).toLocaleString("es-MX") : "-";
               return (
                 <tr key={ev.id}>
@@ -208,7 +249,15 @@ export default function AdminDashboard() {
                   <td>{ev.venue}</td>
                   <td>{ev.city}</td>
                   <td>{next}</td>
-                  <td style={{ textAlign: "right" }}>
+                  <td>
+                    <button onClick={() => togglePublish(ev)} className="btn-secondary" style={{ padding: "6px 10px" }}>
+                      {ev.status === "published" ? "Publicado" : "Borrador"}
+                    </button>
+                  </td>
+                  <td>
+                    <input type="checkbox" checked={!!ev.featured} onChange={() => toggleFeatured(ev)} />
+                  </td>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                     <button onClick={() => onEdit(ev)}>Editar</button>{" "}
                     <button onClick={() => onDelete(ev.id)} className="btn-danger">Eliminar</button>
                   </td>

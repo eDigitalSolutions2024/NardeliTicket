@@ -9,7 +9,6 @@ import {
 
 const router = Router();
 
-// TODO: aquí después pondremos middleware de auth para admin
 router.get("/", listEvents);
 router.get("/:id", getEvent);
 router.post("/", createEvent);

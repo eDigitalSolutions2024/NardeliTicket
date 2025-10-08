@@ -24,11 +24,12 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  display: block;       /* <- ya NO centrado */
+  place-items: unset;   /* <- anula el centrado */
 }
+
 
 h1 {
   font-size: 3.2em;
@@ -93,3 +94,35 @@ button:focus-visible {
 .admin-table th { text-align: left; color: #475569; font-weight: 600; }
 .btn-danger { background: #e53e3e; color: #fff; border: 0; border-radius: 8px; padding: 8px 10px; }
 
+/* === Layout propio (anula el template de Vite) === */
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  display: block;       /* <- ya NO centrado */
+  place-items: unset;   /* <- anula el centrado */
+}
+
+/* Estructura de la app */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Barra superior a todo lo ancho */
+.navbar {
+  width: 100%;
+  background: #222;
+  color: #fff;
+}
+
+/* Contenedor central (opcional) */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* El main se expande */
+main { flex: 1; }

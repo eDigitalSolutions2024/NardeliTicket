@@ -1,29 +1,31 @@
 // src/App.tsx
-import { BrowserRouter as Router, Routes, Route, Link, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import AdminDashboard from "./pages/AdminDashboard";
 import Home from "./pages/Home";
 import Navbar from "./components/Navbar";
+import ProtectedRoute from "./components/ProtectedRoute"; // si lo estás usando
 
 export default function App() {
   return (
     <Router>
-      <header style={{ background: "#222", padding: "10px" }}>
-        <nav>
-          <Link to="/admin" style={{ color: "#fff", fontWeight: 700 }}>
-            Admin
-          </Link>
-        </nav>
-      </header>
+      <Navbar />
 
       <Routes>
-        {/*Home visible en la raiz*/}
+        {/* Home visible en la raíz */}
         <Route path="/" element={<Home />} />
-        {/* Redirige la raíz a /admin */}
-        <Route path="/" element={<Navigate to="/admin" replace />} />
-        {/* Única página activa */}
-        <Route path="/admin" element={<AdminDashboard />} />
-        {/* Cualquier otra ruta también va a /admin */}
-        <Route path="*" element={<Navigate to="/admin" replace />} />
+
+        {/* Admin (protegido, opcional) */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <AdminDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Cualquier otra ruta -> Home */}
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   );

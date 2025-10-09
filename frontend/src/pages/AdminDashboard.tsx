@@ -13,6 +13,7 @@ const emptyForm: FormState = {
   sessions: [],
   status: "draft",
   featured: false,
+  pricing: { vip: 0, oro: 0 },
 };
 
 // utils
@@ -95,6 +96,10 @@ export default function AdminDashboard() {
       ...form,
       sessions: normalizeSessions(form.sessions),
       status: (form.status ?? "draft") as "draft" | "published",
+      pricing: {
+        vip: Number(form.pricing?.vip ?? 0),
+        oro: Number(form.pricing?.oro ?? 0),
+      },
     };
 
     setSaving(true);
@@ -130,6 +135,10 @@ export default function AdminDashboard() {
       sessions: normalizeSessions(ev.sessions ?? []),
       status: (ev.status ?? "draft") as EventStatus,
       featured: Boolean(ev.featured),
+      pricing: {                      // ⬅️ NUEVO
+        vip: ev.pricing?.vip ?? 0,
+        oro: ev.pricing?.oro ?? 0,
+    },
     });
     setSessionInput("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -270,6 +279,39 @@ export default function AdminDashboard() {
               <option value="published">Publicado</option>
             </select>
           </label>
+
+          <label>
+              Precio VIP
+              <input
+                type="number"
+                min={0}
+                value={form.pricing?.vip ?? 0}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    pricing: { ...(f.pricing ?? {}), vip: Number(e.target.value) },
+                  }))
+                }
+                placeholder="0"
+              />
+            </label>
+
+            <label>
+              Precio Oro
+              <input
+                type="number"
+                min={0}
+                value={form.pricing?.oro ?? 0}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    pricing: { ...(f.pricing ?? {}), oro: Number(e.target.value) },
+                  }))
+                }
+                placeholder="0"
+              />
+            </label>
+
 
           <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <input

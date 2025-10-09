@@ -8,6 +8,14 @@ const SessionSchema = new Schema(
   { _id: true }
 );
 
+const PricingSchema = new Schema(
+  {
+    vip: { type: Number, min: 0, default: 0 },  // precio en MXN
+    oro: { type: Number, min: 0, default: 0 },
+  },
+  { _id: false }
+);
+
 const EventSchema = new Schema(
   {
     title:    { type: String, required: true, index: "text" },
@@ -20,6 +28,8 @@ const EventSchema = new Schema(
     // Si agregaste estos campos en tu UI:
     status:   { type: String, enum: ["draft","published"], default: "draft" },
     featured: { type: Boolean, default: false },
+    // 👇 NUEVO
+    pricing: { type: PricingSchema, default: () => ({ vip: 0, oro: 0 }) },
   },
   { timestamps: true }
 );

@@ -44,6 +44,7 @@ export async function deleteEvent(id: string): Promise<void> {
 }
 
 /* helpers */
+/* helpers */
 const mapToEventItem = (d: any): EventItem => ({
   id: d._id?.toString?.() ?? d.id,
   title: d.title,
@@ -54,11 +55,17 @@ const mapToEventItem = (d: any): EventItem => ({
   sessions: (d.sessions ?? []).map((s: any) => ({ id: s._id?.toString?.(), date: s.date })),
   status: d.status ?? "draft",
   featured: Boolean(d.featured),
+
+  // ⬇️ NUEVO
+  pricing: {
+    vip: d.pricing?.vip ?? 0,
+    oro: d.pricing?.oro ?? 0,
+  },
 });
 
 // Para crear: incluimos todo lo necesario explícitamente
 function toCreateBody(p: Partial<EventItem>) {
-  return {
+  const body: any = {
     title: p.title,
     venue: p.venue,
     city: p.city,
@@ -68,7 +75,15 @@ function toCreateBody(p: Partial<EventItem>) {
     status: p.status,
     featured: p.featured,
   };
-}
+
+  if (p.pricing) {
+    body.pricing = {
+      vip: p.pricing.vip,
+      oro: p.pricing.oro,
+    };
+  }
+  return body;
+};
 
 // Para actualizar: SOLO enviamos los campos presentes.
 // ⚠️ Si NO pasas sessions, NO se mandan y NO se borran en DB.
@@ -81,8 +96,26 @@ function toUpdateBody(p: Partial<EventItem>) {
   if (p.category !== undefined) body.category = p.category;
   if (p.status !== undefined) body.status = p.status;
   if (p.featured !== undefined) body.featured = p.featured;
+
+  // ✅ solo si quieres tocar sesiones
   if (p.sessions !== undefined) {
     body.sessions = p.sessions.map((s) => ({ date: s.date }));
   }
+
+  // ✅ IMPORTANTE: mandar precios si vienen
+  if (p.pricing && (p.pricing.vip !== undefined || p.pricing.oro !== undefined)) {
+    body.pricing = {};
+    if (p.pricing.vip !== undefined) body.pricing.vip = Number(p.pricing.vip);
+    if (p.pricing.oro !== undefined) body.pricing.oro = Number(p.pricing.oro);
+  }
+
   return body;
+}
+
+
+
+// ...
+export async function getEvent(id: string): Promise<EventItem> {
+  const { data } = await api.get(`/api/events/${id}`);
+  return mapToEventItem(data);
 }

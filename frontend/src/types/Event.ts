@@ -1,3 +1,8 @@
+export interface TicketPricing {
+  vip?: number;
+  oro?: number;
+}
+
 export interface EventSession { id?: string; date: string; } // ISO
 export type EventStatus = "draft" | "published";
 
@@ -11,4 +16,5 @@ export interface EventItem {
   sessions: EventSession[];
   status?: EventStatus;
   featured?: boolean;
+  pricing?: TicketPricing;
 }

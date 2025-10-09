@@ -5,6 +5,8 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AuthPage from "./pages/AuthPage";
 import Navbar from "./components/Navbar";
 import AdminRoute from "./components/AdminRoute";
+import EventDetail from "./pages/EventDetail";
+
 
 export default function App() {
   return (
@@ -14,6 +16,7 @@ export default function App() {
         {/* Públicas */}
         <Route path="/" element={<Home />} />
         <Route path="/events" element={<EventsPage />} />
+        <Route path="/events/:id" element={<EventDetail />} />
 
         {/* Auth */}
         <Route path="/auth" element={<AuthPage />} />

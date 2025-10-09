@@ -36,7 +36,6 @@ export async function getEvent(req: Request, res: Response) {
 }
 
 /** POST /api/events */
-/** POST /api/events */
 export async function createEvent(req: Request, res: Response) {
   try {
     const {
@@ -44,7 +43,8 @@ export async function createEvent(req: Request, res: Response) {
       category,
       sessions = [],
       status,           // ⬅️ NUEVO
-      featured          // ⬅️ NUEVO
+      featured,         // ⬅️ NUEVO
+      pricing           // ⬅️ NUEVO { vip, oro }
     } = req.body || {};
 
     if (!title || !venue || !city || !imageUrl) {
@@ -55,6 +55,12 @@ export async function createEvent(req: Request, res: Response) {
       ? sessions.map((s: any) => ({ date: new Date(s.date ?? s) }))
       : [];
 
+    // ⬅️ NUEVO: normalizar precios (si no vienen, por defecto 0)
+    const normalizedPricing = {
+      vip: Number(pricing?.vip ?? 0),
+      oro: Number(pricing?.oro ?? 0),
+    };
+
     const ev = await Event.create({
       title,
       venue,
@@ -62,8 +68,9 @@ export async function createEvent(req: Request, res: Response) {
       imageUrl,
       category,
       sessions: normalizedSessions,
-      status,                 // ⬅️ guarda status (Mongoose respeta enum/default)
+      status,                 // ⬅️ guarda status
       featured: !!featured,   // ⬅️ guarda featured
+      pricing: normalizedPricing, // ⬅️ NUEVO
     });
 
     res.status(201).json(ev);
@@ -73,8 +80,6 @@ export async function createEvent(req: Request, res: Response) {
   }
 }
 
-
-/** PUT /api/events/:id */
 /** PUT /api/events/:id */
 export async function updateEvent(req: Request, res: Response) {
   try {
@@ -83,7 +88,8 @@ export async function updateEvent(req: Request, res: Response) {
       title, venue, city, imageUrl,
       category, sessions,
       status,           // ⬅️ NUEVO
-      featured          // ⬅️ NUEVO
+      featured,         // ⬅️ NUEVO
+      pricing           // ⬅️ NUEVO { vip, oro }
     } = req.body || {};
 
     const update: any = {};
@@ -100,7 +106,13 @@ export async function updateEvent(req: Request, res: Response) {
     if (status !== undefined) update.status = status;        // ⬅️ aplica status
     if (featured !== undefined) update.featured = !!featured;// ⬅️ aplica featured
 
-    const ev = await Event.findByIdAndUpdate(id, update, { new: true });
+    // ⬅️ NUEVO: actualización parcial de precios
+    if (pricing && (pricing.vip !== undefined || pricing.oro !== undefined)) {
+      if (pricing.vip !== undefined) update["pricing.vip"] = Number(pricing.vip);
+      if (pricing.oro !== undefined) update["pricing.oro"] = Number(pricing.oro);
+    }
+
+    const ev = await Event.findByIdAndUpdate(id, update, { new: true, runValidators: true, upsert: false });
     if (!ev) return res.status(404).json({ error: "Event not found" });
     res.json(ev);
   } catch (e) {
@@ -108,7 +120,6 @@ export async function updateEvent(req: Request, res: Response) {
     res.status(500).json({ error: "Failed to update event" });
   }
 }
-
 
 /** DELETE /api/events/:id */
 export async function deleteEvent(req: Request, res: Response) {

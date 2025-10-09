@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import "./Navbar.css"; // crea este archivo o cambia por App.css
+import "./Navbar.css";
+import { useAuth } from "../store/useAuth";
+import { getMe } from "../api/auth";
 
 const BRAND = "NardeliTicket";
 
@@ -16,10 +18,40 @@ export default function Navbar() {
   const [cartCount, setCartCount] = useState<number>(0);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // --- auth store ---
+  const { user, token, setAuth, logout } = useAuth();
+  const [openUserMenu, setOpenUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Si hay token pero no tenemos user aún, pedimos /me
+  useEffect(() => {
+    (async () => {
+      if (token && !user) {
+        try {
+          const { user: u } = await getMe();
+          setAuth(u, token);
+        } catch {
+          // token inválido -> limpiar
+          logout();
+        }
+      }
+    })();
+  }, [token, user, setAuth, logout]);
+
+  // cerrar dropdown al click fuera
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (!userMenuRef.current) return;
+      if (!userMenuRef.current.contains(e.target as Node)) setOpenUserMenu(false);
+    };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
+
   // Sync q from URL → input
   useEffect(() => setQuery(qFromUrl), [qFromUrl]);
 
-  // Demo: lee contador de carrito desde localStorage (ajusta cuando tengas store real)
+  // Demo cart count
   useEffect(() => {
     const n = Number(localStorage.getItem("cartCount") || "0");
     setCartCount(Number.isFinite(n) ? n : 0);
@@ -37,29 +69,26 @@ export default function Navbar() {
     e.preventDefault();
     const params = new URLSearchParams(window.location.search);
     query ? params.set("q", query) : params.delete("q");
-    // al hacer búsqueda, vuelve a página 1 (si usas paginación)
     params.delete("page");
     navigate({ pathname: "/", search: params.toString() });
     setMenuOpen(false);
   };
 
+  const initials = (user?.name || user?.email || "?")
+    .split(" ")
+    .map(p => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
   return (
     <header className="nv">
       <div className="nv__inner">
         <div className="nv__left">
-          <button
-            className="nv__burger"
-            aria-label="Abrir menú"
-            onClick={() => setMenuOpen(v => !v)}
-          >
-            ☰
-          </button>
-
+          <button className="nv__burger" aria-label="Abrir menú" onClick={() => setMenuOpen(v => !v)}>☰</button>
           <Link to="/" className="nv__brand" onClick={() => setMenuOpen(false)}>
-            <span className="nv__logo" aria-hidden>🎟️</span>
-            {BRAND}
+            <span className="nv__logo" aria-hidden>🎟️</span>{BRAND}
           </Link>
-
           <nav className={`nv__links ${menuOpen ? "is-open" : ""}`}>
             <Link to="/" onClick={() => setMenuOpen(false)}>Inicio</Link>
             <Link to="/events" onClick={() => setMenuOpen(false)}>Eventos</Link>
@@ -82,7 +111,43 @@ export default function Navbar() {
           <Link to="/cart" className="nv__cart" aria-label={`Carrito con ${cartCount} artículos`}>
             🛒<span className="nv__badge">{cartCount}</span>
           </Link>
-          <Link to="/login" className="nv__login">Iniciar sesión</Link>
+
+          {/* --- Si NO hay sesión -> botón login --- */}
+          {!token ? (
+            <Link to="/auth?tab=login" className="nv__login">Iniciar sesión</Link>
+          ) : (
+            // --- Si hay sesión -> menú de usuario ---
+            <div className="nv__user" ref={userMenuRef}>
+              <button
+                className="nv__userbtn"
+                onClick={() => setOpenUserMenu(v => !v)}
+                aria-haspopup="menu"
+                aria-expanded={openUserMenu}
+                title={user?.name || user?.email}
+              >
+                <span className="nv__avatar">{initials}</span>
+                <span className="nv__username">{user?.name || user?.email}</span>
+                <span className="nv__chev">▾</span>
+              </button>
+
+              {openUserMenu && (
+                <div className="nv__menu" role="menu">
+                  <Link to="/account" role="menuitem" onClick={() => setOpenUserMenu(false)}>Configuración</Link>
+                  <Link to="/admin" role="menuitem" onClick={() => setOpenUserMenu(false)}>Panel Admin</Link>
+                  <button
+                    role="menuitem"
+                    onClick={() => {
+                      logout();
+                      setOpenUserMenu(false);
+                      navigate("/"); // a donde quieras redirigir
+                    }}
+                  >
+                    Cerrar sesión
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>

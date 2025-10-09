@@ -56,3 +56,20 @@
   .nv__links.is-open { display: grid; gap: .5rem; }
   .nv__search { flex: 1; }
 }
+
+
+.nv__user { position: relative; }
+.nv__userbtn { display: flex; align-items: center; gap: 8px; background: transparent; border: 0; color: #fff; cursor: pointer; }
+.nv__avatar { width: 28px; height: 28px; border-radius: 999px; background: #0a5cff; display: grid; place-items: center; font-weight: 800; }
+.nv__username { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nv__chev { opacity: .8; }
+.nv__menu {
+  position: absolute; right: 0; top: 110%;
+  background: #fff; color: #0f172a; min-width: 200px; border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(2,8,23,.18); padding: 6px;
+  display: grid; gap: 4px; z-index: 20;
+}
+.nv__menu a, .nv__menu button {
+  text-align: left; padding: 10px 12px; border-radius: 8px; border: 0; background: transparent; color: inherit; cursor: pointer;
+}
+.nv__menu a:hover, .nv__menu button:hover { background: #f1f5f9; }

@@ -6,7 +6,7 @@ import AuthPage from "./pages/AuthPage";
 import Navbar from "./components/Navbar";
 import AdminRoute from "./components/AdminRoute";
 import EventDetail from "./pages/EventDetail";
-
+import SeatSelectionPage from "./pages/SeatSelectionPage";
 
 export default function App() {
   return (
@@ -17,7 +17,10 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/events/:id" element={<EventDetail />} />
-
+        <Route
+          path="/event/:id/seleccion"
+          element={<SeatSelectionPage eventId="demo-1" onProceed={(payload) => console.log(payload)} />}
+        />
         {/* Auth */}
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/login" element={<Navigate to="/auth?tab=login" replace />} />

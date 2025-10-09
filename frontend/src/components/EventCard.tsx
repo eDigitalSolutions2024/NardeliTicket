@@ -1,14 +1,16 @@
-// src/components/EventCard.tsx
 import React from "react";
+import { Link } from "react-router-dom";
 import type { EventItem } from "../types/Event";
 
 type Props = {
   ev: EventItem;
   onClick?: (id: string) => void;
   className?: string;
+  buttonText?: string;
+  hrefBase?: string; // opcional: por si tu detalle es /evento/:id en vez de /events/:id
 };
 
-// Obtiene la próxima fecha futura (o null si no hay)
+// Próxima fecha futura (o null si no hay)
 const getNextDate = (ev: EventItem): Date | null => {
   const now = Date.now();
   const future = (ev.sessions ?? [])
@@ -18,7 +20,13 @@ const getNextDate = (ev: EventItem): Date | null => {
   return future[0] ? new Date(future[0]) : null;
 };
 
-export default function EventCard({ ev, onClick, className }: Props) {
+export default function EventCard({
+  ev,
+  onClick,
+  className,
+  buttonText = "Ver evento",
+  hrefBase = "/events", // cámbialo a "/evento" si tu ruta es /evento/:id
+}: Props) {
   const next = getNextDate(ev);
   const handleClick = () => onClick?.(ev.id);
 
@@ -47,6 +55,18 @@ export default function EventCard({ ev, onClick, className }: Props) {
         <p className="card__price">
           {next ? `Próx.: ${next.toLocaleString("es-MX")}` : "Sin fechas próximas"}
         </p>
+
+        {/* Botón Ver evento */}
+        <div className="card__actions">
+          <Link
+            to={`${hrefBase}/${ev.id}`}
+            className="btn-primary"
+            onClick={(e) => e.stopPropagation()}
+            aria-label={`Ver evento ${ev.title}`}
+          >
+            {buttonText}
+          </Link>
+        </div>
       </div>
     </article>
   );

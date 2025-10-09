@@ -133,13 +133,18 @@ export default function Navbar() {
               {openUserMenu && (
                 <div className="nv__menu" role="menu">
                   <Link to="/account" role="menuitem" onClick={() => setOpenUserMenu(false)}>Configuración</Link>
-                  <Link to="/admin" role="menuitem" onClick={() => setOpenUserMenu(false)}>Panel Admin</Link>
+
+                  {/* Mostrar “Panel Admin” solo si el rol es admin */}
+                  {user?.role === "admin" && (
+                    <Link to="/admin" role="menuitem" onClick={() => setOpenUserMenu(false)}>Panel Admin</Link>
+                  )}
+
                   <button
                     role="menuitem"
                     onClick={() => {
                       logout();
                       setOpenUserMenu(false);
-                      navigate("/"); // a donde quieras redirigir
+                      navigate("/");
                     }}
                   >
                     Cerrar sesión

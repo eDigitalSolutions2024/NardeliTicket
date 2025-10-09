@@ -20,7 +20,7 @@ export default function Login() {
 
   return (
     <div className="container" style={{ maxWidth: 420, paddingTop: 40 }}>
-      <h1>Ingresar</h1>
+      <h1>Iniciar Sesion</h1>
       <form onSubmit={onSubmit} className="admin-form">
         <label>Email <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required /></label>
         <label>Contraseña <input type="password" value={password} onChange={e=>setPassword(e.target.value)} required /></label>

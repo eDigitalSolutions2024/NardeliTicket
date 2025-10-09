@@ -20,6 +20,9 @@ export default function AuthPage() {
   return (
     <div className="auth">
       <div className="auth__card">
+        <div className="auth__panel" role="tabpanel">
+          {tab === "login" ? <Login /> : <Register />}
+        </div>
         <div className="auth__tabs" role="tablist" aria-label="Autenticación">
           <button
             role="tab"
@@ -39,9 +42,7 @@ export default function AuthPage() {
           </button>
         </div>
 
-        <div className="auth__panel" role="tabpanel">
-          {tab === "login" ? <Login /> : <Register />}
-        </div>
+        
       </div>
     </div>
   );

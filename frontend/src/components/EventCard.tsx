@@ -14,6 +14,7 @@ export type EventItem = {
 type Props = {
   ev: EventItem;
   onClick?: (id: string) => void;
+  className?: string;
 };
 
 export default function EventCard({ ev, onClick }: Props) {

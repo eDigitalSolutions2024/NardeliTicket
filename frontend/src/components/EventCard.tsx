@@ -1,15 +1,6 @@
+// src/components/EventCard.tsx
 import React from "react";
-
-export type EventItem = {
-  id: string;
-  title: string;
-  date: string;     // ISO o display
-  city: string;
-  venue: string;
-  image: string;
-  priceFrom: number;
-  available?: boolean;
-};
+import type { EventItem } from "../types/Event";
 
 type Props = {
   ev: EventItem;
@@ -17,57 +8,45 @@ type Props = {
   className?: string;
 };
 
-export default function EventCard({ ev, onClick }: Props) {
+// Obtiene la próxima fecha futura (o null si no hay)
+const getNextDate = (ev: EventItem): Date | null => {
+  const now = Date.now();
+  const future = (ev.sessions ?? [])
+    .map((s) => new Date(s.date).getTime())
+    .filter((t) => t >= now)
+    .sort((a, b) => a - b);
+  return future[0] ? new Date(future[0]) : null;
+};
+
+export default function EventCard({ ev, onClick, className }: Props) {
+  const next = getNextDate(ev);
+  const handleClick = () => onClick?.(ev.id);
+
   return (
     <article
-      onClick={() => onClick?.(ev.id)}
-      role="button"
-      style={{
-        border: "1px solid #e2e8f0",
-        borderRadius: 12,
-        overflow: "hidden",
-        cursor: "pointer",
-        background: "#fff",
+      className={`card ${onClick ? "card--clickable" : ""} ${className ?? ""}`}
+      onClick={handleClick}
+      tabIndex={onClick ? 0 : -1}
+      onKeyDown={(e) => {
+        if (onClick && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          handleClick();
+        }
       }}
     >
-      <div style={{ position: "relative", height: 160, overflow: "hidden" }}>
-        <img
-          src={ev.image}
-          alt={ev.title}
-          loading="lazy"
-          style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .3s" }}
-          onMouseOver={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
-          onMouseOut={(e) => (e.currentTarget.style.transform = "scale(1)")}
-        />
-        {!ev.available && (
-          <span
-            style={{
-              position: "absolute", top: 8, left: 8,
-              background: "#ef4444", color: "#fff",
-              padding: "4px 8px", borderRadius: 8, fontSize: 12, fontWeight: 700
-            }}
-          >
-            Agotado
-          </span>
-        )}
+      <div style={{ position: "relative" }}>
+        {!next && <span className="card__badge--soldout">Agotado</span>}
+        <img className="card__image" src={ev.imageUrl} alt={ev.title} loading="lazy" />
       </div>
-      <div style={{ padding: 12 }}>
-        <h3 style={{ margin: 0, fontSize: 16 }}>{ev.title}</h3>
-        <p style={{ margin: "4px 0", color: "#64748b", fontSize: 13 }}>
-          {ev.date} · {ev.city} — {ev.venue}
+
+      <div className="card__body">
+        <h3 className="card__title">{ev.title}</h3>
+        <p className="card__meta">
+          {ev.venue} — {ev.city}
         </p>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <strong>Desde ${ev.priceFrom}</strong>
-          <button
-            style={{
-              height: 32, padding: "0 10px",
-              border: "1px solid #0ea5e9", background: "#0ea5e9",
-              color: "#fff", borderRadius: 8, cursor: "pointer", fontWeight: 700
-            }}
-          >
-            Ver
-          </button>
-        </div>
+        <p className="card__price">
+          {next ? `Próx.: ${next.toLocaleString("es-MX")}` : "Sin fechas próximas"}
+        </p>
       </div>
     </article>
   );

@@ -101,11 +101,15 @@ export default function EventDetail() {
               className="btn-primary"
               disabled={!selected}
               onClick={() => {
-                if (!selected) return;
-                // Aquí harás el flujo real de compra o agregar al carrito
-                // por ahora redirigimos a /cart simulando selección
-                navigate("/cart", { state: { eventId: event.id, date: selected } });
-              }}
+                  if (!selected || !event) return;
+                  // Ir a la página de selección con el id en la URL
+                  // y pasar la fecha/ sesión seleccionada por state
+                  navigate(`/event/${event.id}/seleccion`, {
+                    state: { sessionDate: selected,
+                      eventName: event.title,
+                     },
+                  });
+                }}
               style={{ height: 44, padding: "0 16px", fontWeight: 700 }}
             >
               Adquirir boletos

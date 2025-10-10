@@ -1,3 +1,4 @@
+// App.tsx
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Home from "./pages/Home";
 import EventsPage from "./pages/Events";
@@ -17,10 +18,10 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/events/:id" element={<EventDetail />} />
-        <Route
-          path="/event/:id/seleccion"
-          element={<SeatSelectionPage eventId="demo-1" onProceed={(payload) => console.log(payload)} />}
-        />
+
+        {/* 👉 Ruta de selección de asientos (sin props) */}
+        <Route path="/event/:id/seleccion" element={<SeatSelectionPage />} />
+
         {/* Auth */}
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/login" element={<Navigate to="/auth?tab=login" replace />} />

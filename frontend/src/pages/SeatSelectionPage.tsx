@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { getEvent } from "../api/events"; // 👈 precios y nombre desde Mongo
 
 /* ----------------------------- Types ----------------------------- */
 export type SeatStatus = "available" | "reserved" | "held";
@@ -20,34 +22,41 @@ export type EventLayout = {
   maxSeatsPerOrder?: number;
   feePct?: number;
 };
-export type SeatSelectionPageProps = {
-  eventId: string;
-  onProceed: (payload: {
-    eventId: string;
-    items: Array<{ zoneId: string; tableId: string; seatIds: string[]; unitPrice: number }>;
-    totals: { subtotal: number; fees: number; total: number; seatCount: number };
-  }) => void;
-};
 
-/* --------------------- Helpers & Mock Availability --------------------- */
+/* --------------------- Helpers --------------------- */
 function pesos(n: number, currency = "MXN") {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(n);
 }
 
-const MOCK_LAYOUT_BASE: EventLayout = {
-  eventId: "ev-001",
-  eventName: "Gran Noche de Concierto",
-  currency: "MXN",
-  maxSeatsPerOrder: 12,
-  feePct: 5,
-  zones: [
-    { id: "VIP", name: "VIP", color: "#1e62ff", price: 1200, selectionMode: "seat", tables: [] },
-    { id: "ORO", name: "Zona Oro", color: "#d4af37", price: 700, selectionMode: "seat", tables: [] },
-  ],
-};
-
-async function fetchAvailability(eventId: string): Promise<EventLayout> {
-  return new Promise((r) => setTimeout(() => r(MOCK_LAYOUT_BASE), 200));
+/* Carga layout desde API y mapea a EventLayout.
+   Mantiene feePct/maxSeatsPerOrder por defecto para no cambiar el UI. */
+async function fetchAvailability(eventId: string, eventName?: string): Promise<EventLayout> {
+  const ev = await getEvent(eventId);
+  return {
+    eventId: ev.id,
+    eventName: eventName || ev.title || "Evento",
+    currency: "MXN",
+    maxSeatsPerOrder: 12,
+    feePct: 5,
+    zones: [
+      {
+        id: "VIP",
+        name: "VIP",
+        color: "#1e62ff",
+        price: Number(ev.pricing?.vip ?? 0), // 👈 precio real VIP
+        selectionMode: "seat",
+        tables: [],
+      },
+      {
+        id: "ORO",
+        name: "Zona Oro",
+        color: "#d4af37",
+        price: Number(ev.pricing?.oro ?? 0), // 👈 precio real ORO
+        selectionMode: "seat",
+        tables: [],
+      },
+    ],
+  };
 }
 
 /* ----------------------------- Small UI ----------------------------- */
@@ -97,31 +106,39 @@ function SeatDot({
 }
 
 /* -------------------------- Embedded SVG Map -------------------------- */
-/** Parámetros fáciles de ajustar */
 // Tamaños mesa
 const TABLE_W = 170;
 const TABLE_H = 86;
 const TABLE_R = 16;
-
 // separación entre mesas
 const STEP_X = 260;
 const STEP_Y = 190;
-
-// Offsets independientes por zona (arriba/abajo y laterales)
-const VIP_OFFSETS   = { topY: -70, bottomY: 70, leftX: -105, rightX: 110 };
-const ORO_OFFSETS   = { topY: -70, bottomY: 70, leftX: -105, rightX: 110 };
-
-// Genera el patrón de 10 asientos (4 arriba, 4 abajo, 2 laterales)
+// Offsets independientes por zona
+const VIP_OFFSETS = { topY: -70, bottomY: 70, leftX: -105, rightX: 110 };
+const ORO_OFFSETS = { topY: -70, bottomY: 70, leftX: -105, rightX: 110 };
+// Patrón de 10 asientos
 const makePattern = ({
-  topY, bottomY, leftX, rightX,
-}: { topY: number; bottomY: number; leftX: number; rightX: number }): [number, number][] => ([
-  // fila superior
-  [-52, topY], [-26, topY], [0, topY], [26, topY],
-  // fila inferior
-  [-52, bottomY], [-26, bottomY], [0, bottomY], [26, bottomY],
-  // laterales
-  [leftX, 0], [rightX, 0],
-]);
+  topY,
+  bottomY,
+  leftX,
+  rightX,
+}: {
+  topY: number;
+  bottomY: number;
+  leftX: number;
+  rightX: number;
+}): [number, number][] => [
+  [-52, topY],
+  [-26, topY],
+  [0, topY],
+  [26, topY],
+  [-52, bottomY],
+  [-26, bottomY],
+  [0, bottomY],
+  [26, bottomY],
+  [leftX, 0],
+  [rightX, 0],
+];
 
 const SEAT_PATTERN_VIP = makePattern(VIP_OFFSETS);
 const SEAT_PATTERN_ORO = makePattern(ORO_OFFSETS);
@@ -160,7 +177,7 @@ function SeatMapSVG({
     const out: TableGeom[] = [];
     let seatGlobal = 0;
 
-    // ----- ZONA VIP (izquierda) 3 x 5 -----
+    // ZONA VIP (izquierda) 3 x 5
     const vipOrigin = { x: 260, y: 300 };
     let tVip = 0;
     for (let r = 0; r < 5; r++) {
@@ -185,7 +202,7 @@ function SeatMapSVG({
       }
     }
 
-    // ----- ZONA ORO (derecha) 5 x 5 -----
+    // ZONA ORO (derecha) 5 x 5
     const oroOrigin = { x: 1160, y: 300 };
     let tOro = 0;
     for (let r = 0; r < 5; r++) {
@@ -276,7 +293,9 @@ function SeatMapSVG({
           {/* Stage */}
           <g transform="translate(40, 520)">
             <rect x="0" y="-190" width="88" height="380" fill="#111" rx="10" />
-            <text x="44" y="0" fill="#e5e7eb" fontSize="20" textAnchor="middle" transform="rotate(-90 44,0)">STAGE</text>
+            <text x="44" y="0" fill="#e5e7eb" fontSize="20" textAnchor="middle" transform="rotate(-90 44,0)">
+              STAGE
+            </text>
           </g>
 
           {/* Marcos de zona */}
@@ -325,9 +344,13 @@ function SeatMapSVG({
           <g transform="translate(140, 1380)">
             <rect x="0" y="-34" width="600" height="52" fill="#0f1629" rx="12" />
             <line x1="20" y1="-10" x2="80" y2="-10" stroke="#1e62ff" strokeWidth={10} />
-            <text x="92" y="-3" fill="#e5e7eb" fontSize={18}>Marco Azul = VIP</text>
+            <text x="92" y="-3" fill="#e5e7eb" fontSize={18}>
+              Marco Azul = VIP
+            </text>
             <line x1="300" y1="-10" x2="360" y2="-10" stroke="#d4af37" strokeWidth={10} />
-            <text x="372" y="-3" fill="#e5e7eb" fontSize={18}>Marco Dorado = Zona ORO</text>
+            <text x="372" y="-3" fill="#e5e7eb" fontSize={18}>
+              Marco Dorado = Zona ORO
+            </text>
           </g>
         </g>
       </svg>
@@ -336,12 +359,26 @@ function SeatMapSVG({
 }
 
 /* -------------------------- Main Page Component -------------------------- */
-export default function SeatSelectionPage({ eventId, onProceed }: SeatSelectionPageProps) {
+export default function SeatSelectionPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { sessionDate, eventName } = (location.state ?? {}) as { sessionDate?: string; eventName?: string };
+
+  // Si alguien entra sin fecha seleccionada, regrésalo al detalle del evento
+  useEffect(() => {
+    if (!sessionDate && id) navigate(`/events/${id}`, { replace: true });
+  }, [sessionDate, id, navigate]);
+
+  const eventId = id ?? "unknown";
+
   const [layout, setLayout] = useState<EventLayout | null>(null);
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [selected, setSelected] = useState<Record<string, string[]>>({});
 
-  useEffect(() => { fetchAvailability(eventId).then(setLayout); }, [eventId]);
+  useEffect(() => {
+    fetchAvailability(eventId, eventName).then(setLayout);
+  }, [eventId, eventName]);
 
   // Persistencia
   useEffect(() => {
@@ -353,7 +390,8 @@ export default function SeatSelectionPage({ eventId, onProceed }: SeatSelectionP
   }, [eventId, selected]);
 
   // Inyectar mesas al layout
-  const injectTablesIntoLayout = (tables: TableGeom[]) => {
+  type TableGeomLocal = TableGeom; // solo para tipado local
+  const injectTablesIntoLayout = (tables: TableGeomLocal[]) => {
     setLayout((prev) => {
       if (!prev) return prev;
       const clone: EventLayout = JSON.parse(JSON.stringify(prev));
@@ -419,7 +457,9 @@ export default function SeatSelectionPage({ eventId, onProceed }: SeatSelectionP
       return { ...prev, [tableId]: arr };
     });
   }
-  function clearSelection() { setSelected({}); }
+  function clearSelection() {
+    setSelected({});
+  }
 
   if (!layout) return <div style={{ padding: 24 }}>Cargando disposición del evento…</div>;
 
@@ -430,6 +470,9 @@ export default function SeatSelectionPage({ eventId, onProceed }: SeatSelectionP
         <header style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700 }}>{layout.eventName}</h1>
           <Pill>{layout.eventId}</Pill>
+          {sessionDate && (
+            <Pill>{new Date(sessionDate).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}</Pill>
+          )}
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
             <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
               <input type="checkbox" checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} />
@@ -513,7 +556,15 @@ export default function SeatSelectionPage({ eventId, onProceed }: SeatSelectionP
             <button
               onClick={() => {
                 if (layout.maxSeatsPerOrder && totals.seatCount > layout.maxSeatsPerOrder) return;
-                onProceed({ eventId: layout.eventId, items: selectionItems, totals });
+                // Ir al carrito con el payload completo + la fecha seleccionada
+                navigate("/cart", {
+                  state: {
+                    eventId: layout.eventId,
+                    items: selectionItems,
+                    totals,
+                    sessionDate,
+                  },
+                });
               }}
               disabled={selectionItems.length === 0 || !!maxReached}
               style={{

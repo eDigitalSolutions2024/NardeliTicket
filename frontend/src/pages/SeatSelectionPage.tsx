@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getEvent } from "../api/events"; // 👈 precios y nombre desde Mongo
 
@@ -28,8 +28,7 @@ function pesos(n: number, currency = "MXN") {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(n);
 }
 
-/* Carga layout desde API y mapea a EventLayout.
-   Mantiene feePct/maxSeatsPerOrder por defecto para no cambiar el UI. */
+/* Carga layout desde API y mapea a EventLayout (precios y nombre reales) */
 async function fetchAvailability(eventId: string, eventName?: string): Promise<EventLayout> {
   const ev = await getEvent(eventId);
   return {
@@ -43,7 +42,7 @@ async function fetchAvailability(eventId: string, eventName?: string): Promise<E
         id: "VIP",
         name: "VIP",
         color: "#1e62ff",
-        price: Number(ev.pricing?.vip ?? 0), // 👈 precio real VIP
+        price: Number(ev.pricing?.vip ?? 0),
         selectionMode: "seat",
         tables: [],
       },
@@ -51,7 +50,7 @@ async function fetchAvailability(eventId: string, eventName?: string): Promise<E
         id: "ORO",
         name: "Zona Oro",
         color: "#d4af37",
-        price: Number(ev.pricing?.oro ?? 0), // 👈 precio real ORO
+        price: Number(ev.pricing?.oro ?? 0),
         selectionMode: "seat",
         tables: [],
       },
@@ -106,17 +105,14 @@ function SeatDot({
 }
 
 /* -------------------------- Embedded SVG Map -------------------------- */
-// Tamaños mesa
 const TABLE_W = 170;
 const TABLE_H = 86;
 const TABLE_R = 16;
-// separación entre mesas
 const STEP_X = 260;
 const STEP_Y = 190;
-// Offsets independientes por zona
 const VIP_OFFSETS = { topY: -70, bottomY: 70, leftX: -105, rightX: 110 };
 const ORO_OFFSETS = { topY: -70, bottomY: 70, leftX: -105, rightX: 110 };
-// Patrón de 10 asientos
+
 const makePattern = ({
   topY,
   bottomY,
@@ -365,7 +361,6 @@ export default function SeatSelectionPage() {
   const location = useLocation();
   const { sessionDate, eventName } = (location.state ?? {}) as { sessionDate?: string; eventName?: string };
 
-  // Si alguien entra sin fecha seleccionada, regrésalo al detalle del evento
   useEffect(() => {
     if (!sessionDate && id) navigate(`/events/${id}`, { replace: true });
   }, [sessionDate, id, navigate]);
@@ -389,31 +384,31 @@ export default function SeatSelectionPage() {
     sessionStorage.setItem(`NT_SEL_${eventId}`, JSON.stringify(selected));
   }, [eventId, selected]);
 
-  // Inyectar mesas al layout
-  type TableGeomLocal = TableGeom; // solo para tipado local
-  const injectTablesIntoLayout = (tables: TableGeomLocal[]) => {
-    setLayout((prev) => {
-      if (!prev) return prev;
-      const clone: EventLayout = JSON.parse(JSON.stringify(prev));
-      const vip = tables.filter((t) => t.zoneId === "VIP");
-      const oro = tables.filter((t) => t.zoneId === "ORO");
-      const vipZone = clone.zones.find((z) => z.id === "VIP")!;
-      const oroZone = clone.zones.find((z) => z.id === "ORO")!;
-      vipZone.tables = vip.map((t) => ({
-        id: t.id,
-        name: t.name,
-        capacity: t.capacity,
-        seats: t.seats.map((s) => ({ id: s.id, label: s.label, status: s.status })),
-      }));
-      oroZone.tables = oro.map((t) => ({
-        id: t.id,
-        name: t.name,
-        capacity: t.capacity,
-        seats: t.seats.map((s) => ({ id: s.id, label: s.label, status: s.status })),
-      }));
-      return clone;
-    });
-  };
+ // Inyectar mesas al layout
+type TableGeomLocal = TableGeom; // solo para tipado local
+const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
+  setLayout((prev) => {
+    if (!prev) return prev;
+    const clone: EventLayout = JSON.parse(JSON.stringify(prev));
+    const vip = tables.filter((t) => t.zoneId === "VIP");
+    const oro = tables.filter((t) => t.zoneId === "ORO");
+    const vipZone = clone.zones.find((z) => z.id === "VIP")!;
+    const oroZone = clone.zones.find((z) => z.id === "ORO")!;
+    vipZone.tables = vip.map((t) => ({
+      id: t.id,
+      name: t.name,
+      capacity: t.capacity,
+      seats: t.seats.map((s) => ({ id: s.id, label: s.label, status: s.status })),
+    }));
+    oroZone.tables = oro.map((t) => ({
+      id: t.id,
+      name: t.name,
+      capacity: t.capacity,
+      seats: t.seats.map((s) => ({ id: s.id, label: s.label, status: s.status })),
+    }));
+    return clone;
+  });
+}, []);
 
   // Índices auxiliares
   const priceByTable: Record<string, number> = useMemo(() => {
@@ -446,7 +441,8 @@ export default function SeatSelectionPage() {
     return { subtotal, fees, total: subtotal + fees, seatCount };
   }, [layout, selectionItems]);
 
-  const maxReached = layout?.maxSeatsPerOrder && totals.seatCount > (layout.maxSeatsPerOrder ?? Infinity);
+  const maxReached =
+    layout?.maxSeatsPerOrder && totals.seatCount > (layout.maxSeatsPerOrder ?? Infinity);
 
   function handleToggleFromMap(tableId: string, seatId: string) {
     setSelected((prev) => {
@@ -471,11 +467,20 @@ export default function SeatSelectionPage() {
           <h1 style={{ fontSize: 22, fontWeight: 700 }}>{layout.eventName}</h1>
           <Pill>{layout.eventId}</Pill>
           {sessionDate && (
-            <Pill>{new Date(sessionDate).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })}</Pill>
+            <Pill>
+              {new Date(sessionDate).toLocaleString("es-MX", {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })}
+            </Pill>
           )}
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
             <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <input type="checkbox" checked={onlyAvailable} onChange={(e) => setOnlyAvailable(e.target.checked)} />
+              <input
+                type="checkbox"
+                checked={onlyAvailable}
+                onChange={(e) => setOnlyAvailable(e.target.checked)}
+              />
               Mostrar solo disponibles
             </label>
             <button
@@ -555,17 +560,31 @@ export default function SeatSelectionPage() {
             )}
             <button
               onClick={() => {
-                if (layout.maxSeatsPerOrder && totals.seatCount > layout.maxSeatsPerOrder) return;
-                // Ir al carrito con el payload completo + la fecha seleccionada
-                navigate("/cart", {
-                  state: {
+                  if (layout.maxSeatsPerOrder && totals.seatCount > (layout.maxSeatsPerOrder ?? Infinity)) return;
+
+                  const rawToken = localStorage.getItem("token");
+                  const hasToken =
+                    !!rawToken && rawToken !== "undefined" && rawToken !== "null" && rawToken.trim() !== "";
+
+                  const payload = {
                     eventId: layout.eventId,
                     items: selectionItems,
                     totals,
                     sessionDate,
-                  },
-                });
-              }}
+                  };
+
+                  if (!hasToken) {
+                    sessionStorage.setItem("NT_PENDING_CHECKOUT", JSON.stringify(payload));
+                    // ⬇️ AuthPage es tu layout (archivo AuthPage.tsx)
+                    navigate("/auth?tab=login", { state: { redirectTo: "/cart" }, replace: true });
+                    return;
+                  }
+
+                  // Con sesión → al carrito
+                  navigate("/cart", { state: payload });
+                }}
+
+
               disabled={selectionItems.length === 0 || !!maxReached}
               style={{
                 width: "100%",

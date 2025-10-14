@@ -8,6 +8,18 @@ import Navbar from "./components/Navbar";
 import AdminRoute from "./components/AdminRoute";
 import EventDetail from "./pages/EventDetail";
 import SeatSelectionPage from "./pages/SeatSelectionPage";
+import CartPage from "./pages/Cart"; // 👈 nuevo
+
+function RequireAuth({ children }: { children: JSX.Element }) {
+  const token = localStorage.getItem("token");
+  const hasToken = !!token && token !== "undefined" && token !== "null" && token.trim() !== "";
+  if (!hasToken) {
+    return <Navigate to="/auth?tab=login" replace state={{ redirectTo: "/cart" }} />;
+  }
+  return children;
+}
+
+
 
 export default function App() {
   return (
@@ -26,6 +38,18 @@ export default function App() {
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/login" element={<Navigate to="/auth?tab=login" replace />} />
         <Route path="/register" element={<Navigate to="/auth?tab=register" replace />} />
+
+
+
+        {/* Cart (recomendado protegido) */}
+        <Route
+          path="/cart"
+          element={
+            <RequireAuth>
+              <CartPage />
+            </RequireAuth>
+          }
+        />
 
         {/* Admin protegido */}
         <Route

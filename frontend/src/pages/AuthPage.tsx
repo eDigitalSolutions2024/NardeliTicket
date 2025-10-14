@@ -1,28 +1,61 @@
 // src/pages/AuthPage.tsx
-import { useSearchParams } from "react-router-dom";
-import { useMemo } from "react";
+import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
+import { useMemo, useEffect, useCallback } from "react";
 import Login from "./Login";
 import Register from "./Register";
 import "../CSS/Auth.css";
 
+type Tab = "login" | "register";
+
 export default function AuthPage() {
   const [params, setParams] = useSearchParams();
-  const tab = useMemo<"login" | "register">(
+  const tab = useMemo<Tab>(
     () => (params.get("tab") === "register" ? "register" : "login"),
     [params]
   );
 
-  const setTab = (t: "login" | "register") => {
+  const setTab = (t: Tab) => {
     params.set("tab", t);
     setParams(params, { replace: true });
   };
+
+  const location = useLocation() as any;
+  const navigate = useNavigate();
+  const redirectTo: string = location.state?.redirectTo || "/cart";
+
+  useEffect(() => {
+    const tok = localStorage.getItem("token");
+    const hasToken = !!tok && tok !== "undefined" && tok !== "null" && tok.trim() !== "";
+    if (hasToken) navigate(redirectTo, { replace: true });
+  }, [navigate, redirectTo]);
+
+  // src/pages/AuthPage.tsx (solo cambia handleAuthSuccess)
+const handleAuthSuccess = useCallback((token: string) => {
+  localStorage.setItem("token", token);
+
+  // intenta recuperar el payload pendiente
+  let pending: any = null;
+  try {
+    const raw = sessionStorage.getItem("NT_PENDING_CHECKOUT");
+    if (raw) pending = JSON.parse(raw);
+  } catch {}
+
+  // navega a /cart con state (si hay), y deja el storage para que Cart lo borre al consumirlo
+  navigate(redirectTo, { replace: true, state: pending || undefined });
+}, [navigate, redirectTo]);
+
 
   return (
     <div className="auth">
       <div className="auth__card">
         <div className="auth__panel" role="tabpanel">
-          {tab === "login" ? <Login /> : <Register />}
+          {tab === "login"
+            ? <Login onSuccess={handleAuthSuccess} />
+            : <Register onSuccess={handleAuthSuccess} />
+          }
         </div>
+
+
         <div className="auth__tabs" role="tablist" aria-label="Autenticación">
           <button
             role="tab"
@@ -41,8 +74,6 @@ export default function AuthPage() {
             Registrarse
           </button>
         </div>
-
-        
       </div>
     </div>
   );

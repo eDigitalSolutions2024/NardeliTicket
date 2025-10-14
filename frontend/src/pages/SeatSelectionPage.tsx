@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getEvent } from "../api/events"; // 👈 precios y nombre desde Mongo
 
+
+const SALON_IMG = "/salon_blueprint.jpg"; // ruta en /public
+
+
 /* ----------------------------- Types ----------------------------- */
 export type SeatStatus = "available" | "reserved" | "held";
 export type Seat = { id: string; label: string; status: SeatStatus };
@@ -23,6 +27,62 @@ export type EventLayout = {
   feePct?: number;
 };
 
+function ModalImage({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string;
+  alt?: string;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.7)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 50,
+        padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "#0b1220",
+          border: "1px solid #1f2937",
+          borderRadius: 12,
+          maxWidth: "95vw",
+          maxHeight: "90vh",
+          overflow: "hidden",
+          position: "relative",
+        }}
+      >
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            border: "1px solid #374151",
+            background: "#111827",
+            color: "#e5e7eb",
+            borderRadius: 8,
+            padding: "4px 8px",
+            cursor: "pointer",
+          }}
+        >
+          Cerrar ✕
+        </button>
+        <img src={src} alt={alt || "Plano del salón"} style={{ display: "block", maxWidth: "95vw", maxHeight: "90vh" }} />
+      </div>
+    </div>
+  );
+}
 /* --------------------- Helpers --------------------- */
 function pesos(n: number, currency = "MXN") {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(n);
@@ -163,12 +223,15 @@ function SeatMapSVG({
   onlyAvailable,
   onToggle,
   onReady,
+  onPreview, // 👈 nuevo
 }: {
   selected: Record<string, string[]>;
   onlyAvailable: boolean;
   onToggle: (tableId: string, seatId: string) => void;
   onReady: (tables: TableGeom[]) => void;
+  onPreview: () => void; // 👈 nuevo
 }) {
+
   const tables = useMemo<TableGeom[]>(() => {
     const out: TableGeom[] = [];
     let seatGlobal = 0;
@@ -310,6 +373,58 @@ function SeatMapSVG({
               ZONA ORO — 25 mesas × 10 asientos
             </text>
           </g>
+{/* Botón lateral PREVIEW – versión grande */}
+<g transform="translate(2475, 320)" role="button" tabIndex={0}
+   onClick={onPreview}
+   onKeyDown={(e: any) => (e.key === "Enter" || e.key === " ") && onPreview()}
+   style={{ cursor: "pointer" }}>
+  {/* Efecto glow dorado */}
+  <filter id="btnGlowBig" x="-50%" y="-50%" width="200%" height="200%">
+    <feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="#000" floodOpacity="0.6" />
+    <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#fbbf24" floodOpacity="0.9" />
+  </filter>
+
+  {/* Cuerpo del botón */}
+  <rect x="0" y="-130" width="70" height="260" rx="18"
+        fill="#111" stroke="#fbbf24" strokeWidth={4}
+        filter="url(#btnGlowBig)" />
+
+  {/* Ícono cámara */}
+  <g transform="translate(35, -85)">
+    <rect x="-13" y="-10" width="26" height="20" rx="4" fill="#e5e7eb" />
+    <circle cx="0" cy="0" r="5" fill="#111827" />
+    <rect x="10" y="-8" width="8" height="6" rx="2" fill="#e5e7eb" />
+  </g>
+
+  {/* Texto vertical más grande */}
+  <text x="35" y="20" fill="#e5e7eb"
+        fontSize="18" fontWeight="900"
+        textAnchor="middle"
+        transform="rotate(-90 35,20)"
+        style={{ letterSpacing: 3, userSelect: "none" }}>
+    PREVIEW
+  </text>
+
+  {/* Ping animado más notorio */}
+  <circle cx="35" cy="115" r="8" fill="#fbbf24" opacity="0.9">
+    <animate attributeName="r" values="8;18;8" dur="1.6s" repeatCount="indefinite" />
+    <animate attributeName="opacity" values="0.9;0.1;0.9" dur="1.6s" repeatCount="indefinite" />
+  </circle>
+
+  {/* Tooltip mejor centrado */}
+  <g transform="translate(-20, -160)" opacity="0.95">
+    <rect x="-8" y="-28" width="190" height="38" rx="10"
+          fill="#111827" stroke="#374151" />
+    <text x="88" y="-5" fill="#e5e7eb" fontSize="14"
+          fontWeight="600" textAnchor="middle"
+          style={{ pointerEvents: "none" }}>
+      Ver plano del salón
+    </text>
+    <polygon points="86,8 96,-2 76,-2" fill="#111827" />
+  </g>
+</g>
+
+
 
           {/* Mesas + asientos */}
           {tables.map((t) => (
@@ -325,7 +440,7 @@ function SeatMapSVG({
                     key={s.id}
                     cx={s.x}
                     cy={s.y}
-                    r={11}
+                    r={11}  
                     fill={fill}
                     stroke="#111827"
                     strokeWidth={2}
@@ -360,7 +475,7 @@ export default function SeatSelectionPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { sessionDate, eventName } = (location.state ?? {}) as { sessionDate?: string; eventName?: string };
-
+  const [showPreview, setShowPreview] = useState(false);  
   useEffect(() => {
     if (!sessionDate && id) navigate(`/events/${id}`, { replace: true });
   }, [sessionDate, id, navigate]);
@@ -497,6 +612,7 @@ const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
           onlyAvailable={onlyAvailable}
           onToggle={handleToggleFromMap}
           onReady={injectTablesIntoLayout}
+          onPreview={() => setShowPreview(true)} // 👈 nuevo
         />
       </div>
 
@@ -627,6 +743,7 @@ const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
             <SeatDot state="reserved" /> <span>Reservado</span>
           </div>
         </div>
+        {showPreview && <ModalImage src={SALON_IMG} onClose={() => setShowPreview(false)} />}
       </aside>
     </div>
   );

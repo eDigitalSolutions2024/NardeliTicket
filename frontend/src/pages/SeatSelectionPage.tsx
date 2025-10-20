@@ -444,8 +444,10 @@ function SeatMapSVG({
                   isBlocked ? "reserved" : s.status === "available" ? (sel ? "selected" : "available") : s.status;
                 const fill = colorBy(visualState as any);
 
+                const shouldHide = onlyAvailable && !sel && (visualState === "held");
+
                 // si "solo disponibles" está activo, oculta bloqueados salvo que ya estén seleccionados
-                if (onlyAvailable && (visualState !== "available" && !sel)) return null;
+                if (shouldHide) return null;
 
                 return (
                   <circle
@@ -461,7 +463,7 @@ function SeatMapSVG({
                       if (isBlocked && !sel) return;
                       onToggle(t.id, s.id);
                     }}
-                    style={{ cursor: isBlocked && !sel ? "not-allowed" : "pointer", opacity: isBlocked && !sel ? 0.6 : 1 }}
+                    style={{ cursor: isBlocked && !sel ? "not-allowed" : "pointer", opacity: isBlocked && !sel ? 0.9 : 1 }}
                   />
                 );
               })}

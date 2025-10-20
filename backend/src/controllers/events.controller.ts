@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { Event } from "../models/Event";
+import SeatHold from "../models/SeatHold";
+
 
 /** GET /api/events */
 export async function listEvents(req: Request, res: Response) {
@@ -133,3 +135,26 @@ export async function deleteEvent(req: Request, res: Response) {
     res.status(500).json({ error: "Failed to delete event" });
   }
 }
+
+/** GET /api/events/:eventId/blocked
+ *  Devuelve los asientos bloqueados para el evento.
+ *  Por defecto bloquea vendidos ("sold") y holds activos ("active").
+ *  Si solo quieres vendidos, cambia el $in a ["sold"].
+ */
+export async function getBlockedSeats(req: Request, res: Response) {
+  try {
+    const { eventId } = req.params;
+
+    const holds = await SeatHold.find(
+      { eventId, status: { $in: ["sold", "active"] } }, // <- ajusta si quieres solo "sold"
+      { tableId: 1, seatId: 1, _id: 0 }
+    ).lean();
+
+    const blocked = holds.map(h => `${h.tableId}:${h.seatId}`);
+    res.json({ blocked });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: "failed_to_get_blocked" });
+  }
+}
+

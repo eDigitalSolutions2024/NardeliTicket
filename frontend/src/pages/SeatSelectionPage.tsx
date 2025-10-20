@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { getEvent } from "../api/events"; // 👈 precios y nombre desde Mongo
+import { getEvent, fetchBlockedSeats } from "../api/events"; // 👈 precios y nombre desde Mongo
 
 
 const SALON_IMG = "/salon_blueprint.jpg"; // ruta en /public
@@ -224,12 +224,14 @@ function SeatMapSVG({
   onToggle,
   onReady,
   onPreview, // 👈 nuevo
+  blockedKeys,
 }: {
   selected: Record<string, string[]>;
   onlyAvailable: boolean;
   onToggle: (tableId: string, seatId: string) => void;
   onReady: (tables: TableGeom[]) => void;
   onPreview: () => void; // 👈 nuevo
+  blockedKeys?: Set<string>;
 }) {
 
   const tables = useMemo<TableGeom[]>(() => {
@@ -432,24 +434,40 @@ function SeatMapSVG({
               {renderTableRect(t)}
               {t.seats.map((s) => {
                 const sel = (selected[t.id] || []).includes(s.id);
-                const state = s.status === "available" ? (sel ? "selected" : "available") : s.status;
-                const fill = colorBy(state as any);
-                if (onlyAvailable && s.status !== "available" && !sel) return null;
+
+                // 👉 bloqueo por backend
+                const key = `${t.id}:${s.id}`;
+                const isBlocked = blockedKeys?.has(key) ?? false;
+
+                // estado visual (si está bloqueado, lo mostramos como "reserved")
+                const visualState =
+                  isBlocked ? "reserved" : s.status === "available" ? (sel ? "selected" : "available") : s.status;
+                const fill = colorBy(visualState as any);
+
+                // si "solo disponibles" está activo, oculta bloqueados salvo que ya estén seleccionados
+                if (onlyAvailable && (visualState !== "available" && !sel)) return null;
+
                 return (
                   <circle
                     key={s.id}
                     cx={s.x}
                     cy={s.y}
-                    r={11}  
+                    r={11}
                     fill={fill}
                     stroke="#111827"
                     strokeWidth={2}
-                    onClick={() => (s.status === "available" || sel) && onToggle(t.id, s.id)}
+                    // solo permite click si NO está bloqueado, o si ya está seleccionado (para poder deseleccionar)
+                    onClick={() => {
+                      if (isBlocked && !sel) return;
+                      onToggle(t.id, s.id);
+                    }}
+                    style={{ cursor: isBlocked && !sel ? "not-allowed" : "pointer", opacity: isBlocked && !sel ? 0.6 : 1 }}
                   />
                 );
               })}
             </g>
           ))}
+
 
           {/* Leyenda */}
           <g transform="translate(140, 1380)">
@@ -485,6 +503,20 @@ export default function SeatSelectionPage() {
   const [layout, setLayout] = useState<EventLayout | null>(null);
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [selected, setSelected] = useState<Record<string, string[]>>({});
+  const [blockedKeys, setBlockedKeys] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try{
+        const blocked = await fetchBlockedSeats(eventId);
+        if (mounted) setBlockedKeys(new Set(blocked));
+      } catch (e) {
+        console.error("No se puedieron cargar asientos bloqueados");
+      }
+    })();
+    return () => { mounted = false; };
+  }, [eventId]);
 
   useEffect(() => {
     fetchAvailability(eventId, eventName).then(setLayout);
@@ -612,7 +644,8 @@ const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
           onlyAvailable={onlyAvailable}
           onToggle={handleToggleFromMap}
           onReady={injectTablesIntoLayout}
-          onPreview={() => setShowPreview(true)} // 👈 nuevo
+          onPreview={() => setShowPreview(true)}
+          blockedKeys={blockedKeys}// 👈 nuevo
         />
       </div>
 

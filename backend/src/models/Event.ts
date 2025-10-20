@@ -16,6 +16,14 @@ const PricingSchema = new Schema(
   { _id: false }
 );
 
+const PricingCentsSchema = new Schema(
+  {
+    vip: { type: Number, min: 0, default: 0 },
+    oro: { type: Number, min: 0, default: 0 },
+  },
+  { _id: false }
+);
+
 const EventSchema = new Schema(
   {
     title:    { type: String, required: true, index: "text" },
@@ -30,6 +38,8 @@ const EventSchema = new Schema(
     featured: { type: Boolean, default: false },
     // 👇 NUEVO
     pricing: { type: PricingSchema, default: () => ({ vip: 0, oro: 0 }) },
+    pricingCents: { type: PricingCentsSchema, default: () => ({ vip: 0, oro: 0}) },
+    layoutVersion: { type: Number, default: 1 },
   },
   { timestamps: true }
 );

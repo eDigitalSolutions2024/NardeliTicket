@@ -89,37 +89,47 @@ export default function CartPage() {
     setItems([]);
   }
 
-  // 5) Acción principal: Ir a pagar (crea sesión de checkout)
-  async function handleCheckout() {
-    if (!eventId || items.length === 0) return;
+  // 5) Acción principal: Ir a pagar (preflight -> create session)
+async function handleCheckout() {
+  if (!eventId || items.length === 0) return;
 
-    try {
-      const body: CartPayload = { eventId, items, totals, sessionDate };
-      const { data } = await api.post("/api/checkout/create", body);
-      // Convención: backend regresa { url } para Stripe, o { orderId } si es interno
-      if (data?.url) {
-        window.location.href = data.url;
-      } else if (data?.orderId) {
-        navigate(`/order/${data.orderId}`);
-      } else {
-        alert("Checkout creado, pero no se recibió URL ni ID de orden.");
-      }
-    } catch (err: any) {
-      // Si no está autenticado, el interceptor quizá no redirige.
-      if (err?.response?.status === 401) {
-        navigate("/auth?tab=login", { state: { redirectTo: "/cart" }, replace: true });
-        return;
-      }
-      if (err?.response?.status === 409) {
-        // conflicto típico: asiento ya no está disponible
-        alert("Algunos asientos ya no están disponibles. Vuelve a seleccionar.");
-        navigate(`/event/${eventId}/seleccion`);
-        return;
-      }
-      console.error(err);
-      alert("No se pudo iniciar el checkout.");
+  try {
+    const bodyBase: CartPayload = { eventId, items, totals, sessionDate };
+
+    // 1) Preflight: confirma totales en el servidor (centavos)
+    const { data: pre } = await api.post("/api/checkout/preflight", bodyBase);
+
+    // (opcional) podrías comparar y mostrar pre.pricing al usuario
+
+    // 2) Crear sesión de checkout usando los totales confirmados
+    const { data } = await api.post("/api/checkout", {
+      ...bodyBase,
+      pricing: pre?.pricing, // <--- totales confirmados en centavos
+      holdGroupId: pre?.hold?.holdGroupId,
+    });
+
+    if (data?.checkoutUrl) {
+      window.location.href = data.checkoutUrl;
+    } else if (data?.orderId) {
+      navigate(`/order/${data.orderId}`);
+    } else {
+      alert("Checkout creado, pero no se recibió URL ni ID de orden.");
     }
+  } catch (err: any) {
+    if (err?.response?.status === 401) {
+      navigate("/auth?tab=login", { state: { redirectTo: "/cart" }, replace: true });
+      return;
+    }
+    if (err?.response?.status === 409) {
+      alert("Algunos asientos ya no están disponibles. Vuelve a seleccionar.");
+      navigate(`/event/${eventId}/seleccion`);
+      return;
+    }
+    console.error(err);
+    alert("No se pudo iniciar el checkout.");
   }
+}
+
 
   // 6) Si no hay payload/ítems, UI de vacío
   if (!initialPayload && items.length === 0) {

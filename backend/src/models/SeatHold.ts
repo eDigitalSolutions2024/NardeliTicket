@@ -7,11 +7,19 @@ export interface ISeatHold extends Document {
   userId: string;
   orderId?: string;
   createdAt: Date;
+  holdGroup: String;
+  expiresAt: Date;
+  status: "active" | "attached_to_order" | "released";
+  eventLayoutVersion?: number;
 }
 
 const SeatHoldSchema = new Schema<ISeatHold>(
   {
     eventId: { type: String, index: true },
+    holdGroup: { type: String, index: true },
+    expiresAt: { type: Date, default: () => new Date(Date.now() + 15* 60 * 1000) },
+    status: {type: String, enum: ["active","attached_to_order","released"], default: "active" },
+    eventLayoutVersion : {type: Number },
     tableId: String,
     seatId: String,
     userId: String,
@@ -22,5 +30,11 @@ const SeatHoldSchema = new Schema<ISeatHold>(
 
 // Limpieza automática a los 15 minutos
 SeatHoldSchema.index({ createdAt: 1 }, { expireAfterSeconds: 15 * 60 });
+
+// Evita que dos usuarios tengan el mismo asiento en "active"
+SeatHoldSchema.index(
+  { eventId: 1, seatId: 1, status: 1 },
+  { unique: true, partialFilterExpression: { status: "active" } }
+);
 
 export default model<ISeatHold>("SeatHold", SeatHoldSchema);

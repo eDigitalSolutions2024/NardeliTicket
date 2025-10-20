@@ -119,3 +119,9 @@ export async function getEvent(id: string): Promise<EventItem> {
   const { data } = await api.get(`/api/events/${id}`);
   return mapToEventItem(data);
 }
+
+// -------- BLOCKED SEATS (sold/active) --------
+export async function fetchBlockedSeats(eventId: string): Promise<string[]> {
+  const { data } = await api.get(`/api/events/${eventId}/blocked`);
+  return Array.isArray(data?.blocked) ? (data.blocked as string[]) : [];
+}

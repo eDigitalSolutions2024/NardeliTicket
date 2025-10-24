@@ -1,8 +1,11 @@
 import { Request, Response } from "express";
+import PDFDocument from "pdfkit";
+import QRCode from "qrcode";
 import Order from "../models/Order";
 import SeatHold from "../models/SeatHold";
 import { stripe } from "../utils/stripe";
 import { Event } from "../models/Event";
+import { ensureTicketPdf, ticketFileName } from "../utils/tickets";
 
 // ---------- Utilidades de pricing (centavos) ----------
 const SERVICE_FEE_PCT = 5;
@@ -186,7 +189,7 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
       mode: "payment",
       line_items,
       metadata: { orderId: order._id.toString(), eventId },
-      success_url: `${process.env.PUBLIC_URL}/checkout/success?order=${order._id}`,
+      success_url: `${process.env.PUBLIC_URL}/checkout/success?orderId=${order._id}`,
       cancel_url: `${process.env.PUBLIC_URL}/checkout/cancel?order=${order._id}`,
       // customer_email: req.user?.email,
     });
@@ -216,3 +219,139 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
     return res.status(500).json({ error: "checkout_failed", message: err.message });
   }
 };
+
+
+
+/**
+ * GET /api/tickets/:ticketId.pdf
+ * Genera un PDF de UN boleto (ticketId) buscando dentro de la colección Order.
+ */
+export async function streamSingleTicketPdf(req: Request, res: Response) {
+  try {
+    const { ticketId } = req.params;
+
+    // 1) Busca la orden que contiene ese ticket
+    const order = await Order.findOne({ "tickets.ticketId": ticketId }).lean();
+    if (!order) return res.status(404).json({ message: "Boleto no encontrado" });
+
+    const ticket = (order.tickets || []).find(t => String(t.ticketId) === String(ticketId));
+    if (!ticket) return res.status(404).json({ message: "Boleto no encontrado" });
+
+    // 2) Carga (opcional) del evento para encabezado
+    let event: any = null;
+    if (order.eventId) {
+      event = await Event.findById(order.eventId).lean();
+    }
+
+    // 3) Headers
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="ticket-${ticketId}.pdf"`);
+
+    // 4) PDF streaming
+    const doc = new PDFDocument({ size: "A4", margin: 36 });
+    doc.pipe(res);
+
+    // Base pública para QR/links
+    const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || "https://localhost:5173";
+
+    // URL de verificación (ajusta al endpoint real si ya lo tienes)
+    const verifyUrl = `${PUBLIC_BASE}/tickets/verify?oid=${order._id}&tid=${ticketId}`;
+
+    // Utilidad: QR -> Buffer PNG
+    async function toQrBuf(text: string): Promise<Buffer> {
+      const dataUrl = await QRCode.toDataURL(text, {
+        errorCorrectionLevel: "M",
+        margin: 1,
+        scale: 6,
+      });
+      const base64 = dataUrl.split(",")[1];
+      return Buffer.from(base64, "base64");
+    }
+
+    // ------- Render del boleto -------
+    // Encabezado
+    doc.fontSize(22).fillColor("#111").text("NardeliTicket");
+    const eventTitle = event?.title || event?.name || "Evento";
+    const eventDate  = event?.date || event?.fecha;
+    const eventLoc   = event?.location || event?.lugar;
+
+    doc.moveDown(0.3).fontSize(14).fillColor("#444")
+       .text(`${eventTitle}  |  Folio: #${order._id}`);
+
+    if (eventDate) {
+      const f = new Date(eventDate).toLocaleString("es-MX");
+      doc.fontSize(12).fillColor("#444").text(`Fecha: ${f}`);
+    }
+    if (eventLoc) {
+      doc.fontSize(12).fillColor("#444").text(`Lugar: ${eventLoc}`);
+    }
+    doc.moveDown();
+
+    // Tarjeta
+    const cardX = 36, cardY = 140, cardW = doc.page.width - 72, cardH = 170;
+    doc.roundedRect(cardX, cardY, cardW, cardH, 10).strokeColor("#e5e7eb").lineWidth(1.5).stroke();
+    doc.fontSize(18).fillColor("#111").text("Boleto", cardX + 12, cardY + 12);
+
+    doc.fontSize(12).fillColor("#333");
+    doc.text(`Ticket ID: ${ticket.ticketId}`, cardX + 12, cardY + 40);
+    doc.text(`Zona: ${ticket.zoneId}`,        cardX + 12, cardY + 58);
+    doc.text(`Mesa: ${ticket.tableId}`,       cardX + 12, cardY + 76);
+    doc.text(`Asiento: ${ticket.seatId}`,     cardX + 12, cardY + 94);
+
+    const qrBuf = await toQrBuf(verifyUrl);
+    const qrSize = 170;
+    doc.image(qrBuf, cardX + cardW - qrSize - 12, cardY + 12, { width: qrSize, height: qrSize });
+
+    doc.fillColor("#6b7280").fontSize(10).text(
+      `Escanea el QR para validar tu boleto.`,
+      cardX + 12, cardY + cardH + 12, { width: cardW - 24 }
+    );
+
+    doc.end();
+  } catch (err) {
+    console.error("PDF ticket error:", err);
+    res.status(500).json({ message: "No se pudo generar el PDF del boleto" });
+  }
+}
+
+export async function generateOrderTicketsPdfs(req: Request, res: Response) {
+  try {
+    const { orderId } = req.params;
+    const order = await Order.findById(orderId).lean();
+    if (!order) return res.status(404).json({ message: "Orden no encontrada" });
+    if (order.status !== "paid") {
+      return res.status(400).json({ message: "La orden no está pagada" });
+    }
+
+    // trae asientos vendidos ligados a la orden
+    const seats = await SeatHold.find({ order: orderId, status: "sold" }).lean();
+
+    // si usas `order.tickets` con ticketId, úsalo; si no, derivamos del seat._id
+    const tickets = (order.tickets && order.tickets.length)
+      ? order.tickets.map((t: any) => ({ ticketId: t.ticketId, seatId: t.seatId }))
+      : seats.map((s: any) => ({ ticketId: String(s._id), seatId: s._id }));
+
+    if (!tickets.length) {
+      return res.status(400).json({ message: "No hay tickets/asientos vendidos para esta orden" });
+    }
+
+    // Genera/asegura PDFs
+    for (const t of tickets) {
+      const seat = seats.find((s: any) => String(s._id) === String(t.seatId)) || null;
+      await ensureTicketPdf({ ticketId: t.ticketId, order, seat });
+    }
+
+    // URLs públicas
+    const base = `${req.protocol}://${req.get("host")}/files/tickets`;
+    const files = tickets.map((t: any) => ({
+      ticketId: t.ticketId,
+      fileName: ticketFileName(t.ticketId),
+      url: `${base}/${ticketFileName(t.ticketId)}`,
+    }));
+
+    return res.json({ orderId, count: files.length, files });
+  } catch (e: any) {
+    console.error("generateOrderTicketsPdfs error:", e);
+    return res.status(500).json({ message: "No se pudieron generar los PDFs", detail: e.message });
+  }
+}

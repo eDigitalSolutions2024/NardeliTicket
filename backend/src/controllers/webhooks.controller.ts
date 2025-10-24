@@ -2,6 +2,41 @@ import { Request, Response } from "express";
 import { stripe } from "../utils/stripe";
 import Order from "../models/Order";
 import SeatHold from "../models/SeatHold";
+import { nanoid } from "nanoid";
+
+// 👇 NUEVO: emite tickets a partir de order.items[].seatIds (idempotente)
+async function issueTicketsForOrder(orderId: string) {
+  const order = await Order.findById(orderId);
+  if (!order) return;
+
+  // Si ya existen tickets, no duplicar
+  if (order.tickets && order.tickets.length) return;
+
+  const tickets: any[] = [];
+  for (const it of order.items || []) {
+    const { zoneId, tableId, seatIds = [] } = it as any;
+    for (const seatId of seatIds) {
+      tickets.push({
+        ticketId: `${orderId}-${seatId}-${nanoid(6)}`,
+        seatId,
+        tableId,
+        zoneId,
+        status: "issued",
+        issuedAt: new Date(),
+      });
+    }
+  }
+
+  order.tickets = tickets;
+  order.status = "paid";
+  order.paidAt = new Date();
+  order.statusTimeline = [
+    ...(order.statusTimeline || []),
+    { status: "paid", at: new Date() },
+  ];
+
+  await order.save();
+}
 
 export const stripeWebhook = async (req: Request, res: Response) => {
   const sig = req.headers["stripe-signature"] as string;
@@ -28,6 +63,8 @@ export const stripeWebhook = async (req: Request, res: Response) => {
           paidAt: new Date(),
           "stripe.paymentIntentId": session.payment_intent,
         });
+
+        await issueTicketsForOrder(orderId);
 
         // Marca los holds de esa orden como vendidos
         await SeatHold.updateMany(
@@ -75,3 +112,5 @@ export const stripeWebhook = async (req: Request, res: Response) => {
 
   res.json({ received: true });
 };
+
+

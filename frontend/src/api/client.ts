@@ -5,6 +5,11 @@ export const api = axios.create({
   timeout: 8000,
 });
 
+export const API_ORIGIN: string =
+  (import.meta.env.VITE_API_URL as string) ?? "http://localhost:4000";
+
+export const API_BASE: string = `${API_ORIGIN}/api`;
+
 // Adjunta Authorization si hay token en localStorage
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");

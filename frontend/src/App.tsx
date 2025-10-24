@@ -9,6 +9,8 @@ import AdminRoute from "./components/AdminRoute";
 import EventDetail from "./pages/EventDetail";
 import SeatSelectionPage from "./pages/SeatSelectionPage";
 import CartPage from "./pages/Cart"; // 👈 nuevo
+import CheckoutSuccess from "./pages/CheckoutSuccess";
+import CheckoutCancel from "./pages/CheckoutCancel";
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const token = localStorage.getItem("token");
@@ -33,11 +35,13 @@ export default function App() {
 
         {/* 👉 Ruta de selección de asientos (sin props) */}
         <Route path="/event/:id/seleccion" element={<SeatSelectionPage />} />
+        
 
         {/* Auth */}
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/login" element={<Navigate to="/auth?tab=login" replace />} />
         <Route path="/register" element={<Navigate to="/auth?tab=register" replace />} />
+
 
 
 
@@ -50,6 +54,9 @@ export default function App() {
             </RequireAuth>
           }
         />
+
+        <Route path="/checkout/success" element={<CheckoutSuccess />} />
+        <Route path="/checkout/cancel" element={<CheckoutCancel />} />
 
         {/* Admin protegido */}
         <Route

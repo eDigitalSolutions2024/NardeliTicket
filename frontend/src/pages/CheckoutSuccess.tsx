@@ -21,9 +21,20 @@ function buildWaUrl(message: string, phone?: string): string {
 }
 
 // 🔗 PDF por boleto: http://localhost:4000/api/checkout/tickets/<ticketId>.pdf
-function buildTicketPdfUrl(tid: string): string {
+/*function buildTicketPdfUrl(tid: string): string {
   return `${API_BASE}/api/checkout/tickets/${tid}.pdf`;
+}*/
+// Reemplaza tu buildTicketPdfUrl actual
+function buildTicketPdfUrl(tid: string): string {
+  // API_BASE podría ser "http://localhost:4000/api" o "http://localhost:4000"
+  const base = API_BASE.replace(/\/+$/, ""); // quita / final
+  // Si ya termina en /api, no lo agregues de nuevo
+  const hasApi = /\/api$/.test(base);
+  const root = hasApi ? base : `${base}/api`;
+  return `${root}/checkout/tickets/${tid}.pdf`;
 }
+
+
 
 export default function CheckoutSuccess(): JSX.Element {
   const location = useLocation();

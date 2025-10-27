@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { createCheckout, preflightCheckout, streamSingleTicketPdf } from "../controllers/checkout.controller";
+import { createCheckout, preflightCheckout, streamSingleTicketPdf, generateOrderTicketsPdfs } from "../controllers/checkout.controller";
 import { requireAuth } from "../middlewares/requireAuth"; // usa tu middleware real
 import Order from "../models/Order";
 
@@ -22,4 +22,5 @@ router.get("/orders/:orderId/tickets", async (req, res) => {
     return res.status(500).json({ message: "Error obteniendo tickets" });
   }
 });
+router.post("/orders/:orderId/tickets/generate", generateOrderTicketsPdfs);
 export default router;

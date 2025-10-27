@@ -1,5 +1,5 @@
 // src/pages/CheckoutSuccess.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { API_BASE, api } from "../api/client";
 
@@ -20,15 +20,25 @@ function buildWaUrl(message: string, phone?: string): string {
   return to ? `https://wa.me/${to}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
 }
 
-// 🔗 PDF por boleto: http://localhost:4000/api/tickets/<ticketId>.pdf
+// 🔗 PDF por boleto: http://localhost:4000/api/checkout/tickets/<ticketId>.pdf
 function buildTicketPdfUrl(tid: string): string {
-  return `${API_BASE}/checkout/tickets/${tid}.pdf`;
+  return `${API_BASE}/api/checkout/tickets/${tid}.pdf`;
 }
 
 export default function CheckoutSuccess(): JSX.Element {
   const location = useLocation();
   const state = (location.state as LocationState) || {};
   const [searchParams] = useSearchParams();
+  const [generatedUrls, setGeneratedUrls] = useState<string[]>([]);
+  const [loadingGen, setLoadingGen] = useState(false);
+  const [errorGen, setErrorGen] = useState<string | null>(null);
+  // ⬇️ NUEVOS estados para el envío por WhatsApp via backend
+  const [sendingWa, setSendingWa] = useState(false);
+  const [sentOkWa, setSentOkWa] = useState<boolean | null>(null);
+  const [sendErrWa, setSendErrWa] = useState<string | null>(null);
+  // Para asegurar que se dispare solo una vez automáticamente
+  const alreadySentRef = useRef(false);
+
 
   // orderId y/o ticketIds pueden venir por state o query (?orderId=..., ?ticketId=... o ?ticketIds=a,b,c)
   const orderId =
@@ -72,9 +82,22 @@ export default function CheckoutSuccess(): JSX.Element {
     };
   }, [orderId, ticketIds]);
 
-  const pdfUrls = useMemo<string[]>(() => {
-    return (ticketIds || []).map(buildTicketPdfUrl);
-  }, [ticketIds]);
+  // ⬇️ Enviar automáticamente una vez si tenemos phone + ticketIds
+  useEffect(() => {
+    if (alreadySentRef.current) return;
+    const ok =
+      (ticketIds?.length || 0) > 0 &&
+      !!sanitizePhone(phone || "");
+    if (ok) {
+      alreadySentRef.current = true;
+      void sendTicketsViaWhatsApp();
+    }
+  }, [ticketIds, phone]);
+
+ const pdfUrls = useMemo<string[]>(() => {
+   if (generatedUrls.length) return generatedUrls;
+   return (ticketIds || []).map(buildTicketPdfUrl);
+ }, [generatedUrls, ticketIds]);
 
   const messageText = useMemo<string>(() => {
     const header = `¡Hola! Aquí están tus boletos de NardeliTicket 🎟️`;
@@ -103,7 +126,71 @@ export default function CheckoutSuccess(): JSX.Element {
   };
 
   const handleOpenFirstPdf = (): void => {
-    if (pdfUrls.length) window.open(pdfUrls[0], "_blank", "noopener,noreferrer");
+    if (pdfUrls.length) {
+      window.open(pdfUrls[0], "_blank", "noopener,noreferrer");
+    }
+  };
+
+  // ⬇️ Enviar por WhatsApp usando TU BACKEND (WhatsApp Cloud API)
+  async function sendTicketsViaWhatsApp(): Promise<void> {
+    try {
+      setSendingWa(true);
+      setSendErrWa(null);
+
+      const cleanPhone = sanitizePhone(phone);
+      if (!cleanPhone) throw new Error("No se recibió teléfono para WhatsApp.");
+      const ids = ticketIds || [];
+      if (!ids.length) throw new Error("No hay ticketIds para enviar.");
+
+      await api.post("/api/whatsapp/send-tickets", {
+        phone: cleanPhone,
+        ticketIds: ids,
+        introMessage:
+          "¡Gracias por tu compra en NardeliTickets! Te enviamos tus boletos en PDF.",
+      });
+
+      setSentOkWa(true);
+    } catch (err: any) {
+      console.error("WA send error:", err);
+      setSentOkWa(false);
+      setSendErrWa(
+        err?.response?.data?.error ||
+        err?.message ||
+        "Error al enviar por WhatsApp"
+      );
+    } finally {
+      setSendingWa(false);
+    }
+  }
+
+
+  // Genera y guarda los PDFs; devuelve URLs públicas
+  const handleGeneratePdfs = async (): Promise<void> => {
+    if (!orderId) return;
+    setLoadingGen(true);
+    setErrorGen(null);
+    try {
+      // POST /checkout/orders/:orderId/tickets/generate
+      const { data } = await api.post(`/api/checkout/orders/${orderId}/tickets/generate`);
+      // Esperado: { files: [{ ticketId, fileName, url }], count, orderId }
+      const urls: string[] = Array.isArray(data?.files)
+        ? data.files.map((f: any) => f.url).filter(Boolean)
+        : [];
+      const ids: string[] = Array.isArray(data?.files)
+        ? data.files.map((f: any) => f.ticketId).filter(Boolean)
+        : [];
+
+      if (urls.length) setGeneratedUrls(urls);
+      if (ids.length) setTicketIds(ids);
+
+      if (!urls.length && !ids.length) {
+        setErrorGen("No se generaron PDFs. Verifica que la orden esté pagada y tenga asientos vendidos.");
+      }
+    } catch (e: any) {
+      setErrorGen(e?.response?.data?.message || "No se pudo generar los PDF(s).");
+    } finally {
+      setLoadingGen(false);
+    }
   };
 
   const hasData = Boolean(orderId || (ticketIds && ticketIds.length));
@@ -113,6 +200,23 @@ export default function CheckoutSuccess(): JSX.Element {
       <div style={styles.card}>
         <div style={styles.icon}>✅</div>
         <h1 style={styles.title}>¡Pago confirmado!</h1>
+        {sendingWa && <p>Enviando tus boletos por WhatsApp…</p>}
+
+        {sentOkWa === true && (
+          <p style={{ color: "#16a34a", marginTop: 8 }}>
+            ✅ Boletos enviados por WhatsApp.
+          </p>
+        )}
+
+        {sentOkWa === false && (
+          <div style={{ ...styles.alert, marginTop: 8 }}>
+            ❌ No se pudieron enviar por WhatsApp.<br />
+            <span style={{ whiteSpace: "pre-wrap" }}>{sendErrWa}</span><br />
+            <button onClick={sendTicketsViaWhatsApp} style={{ ...styles.secondaryBtn, marginTop: 8 }}>
+              Reintentar envío
+            </button>
+          </div>
+        )}
         <p style={styles.subtitle}>
           Tu compra se realizó con éxito. {orderId ? `Folio: #${orderId}` : ""}
         </p>
@@ -121,6 +225,29 @@ export default function CheckoutSuccess(): JSX.Element {
           <div style={styles.alert}>
             No se recibieron <b>ticketIds</b> ni <b>orderId</b>. Regresa al inicio o intenta nuevamente.
           </div>
+        )}
+
+        {/* Generar PDFs */}
+        <div style={styles.actions}>
+          <button
+            onClick={sendTicketsViaWhatsApp}
+            style={styles.primaryBtn}
+            disabled={sendingWa || (!pdfUrls.length && !orderId)}
+          >
+            {sendingWa ? "Enviando por WhatsApp…" : "Enviar boletos por WhatsApp"}
+          </button>
+
+          <button onClick={handleOpenFirstPdf} style={styles.secondaryBtn} disabled={!pdfUrls.length}>
+            Abrir primer PDF
+          </button> 
+          <button onClick={handleCopyLinks} style={styles.secondaryBtn} disabled={!pdfUrls.length}>
+            Copiar links
+          </button>
+        </div>
+
+
+        {errorGen && (
+          <div style={{ ...styles.alert, marginTop: 10 }}>{errorGen}</div>
         )}
 
         <div style={styles.section}>
@@ -176,6 +303,8 @@ export default function CheckoutSuccess(): JSX.Element {
     </div>
   );
 }
+
+
 
 const styles: Record<string, React.CSSProperties> = {
   wrap: {

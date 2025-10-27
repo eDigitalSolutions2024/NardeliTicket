@@ -1,4 +1,5 @@
 // src/app.ts
+import path from "path";
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
@@ -7,6 +8,7 @@ import authRouter from "./routes/auth.routes";
 import bodyParser from "body-parser";
 import checkoutRoutes from "./routes/checkout.routes";
 import webhookRoutes from "./routes/webhooks.routes";
+import whatsappRoutes from "./routes/whatsapp.routes";
 
 const app = express();
 
@@ -17,6 +19,10 @@ app.use(express.json());
 app.use(morgan("dev"));
 app.use(bodyParser.json());
 
+app.use(
+  "/files",
+  express.static(path.join(__dirname, "tickets"), { fallthrough: true })
+);
 
 app.use("/api/checkout", checkoutRoutes);
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
@@ -24,4 +30,6 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/events", eventsRouter);
 
 app.use("/api/auth", authRouter);
+
+app.use("/api/whatsapp", whatsappRoutes);
 export default app;

@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import "./Navbar.css";
-import { useAuth } from "../store/useAuth";
-import { getMe } from "../api/auth";
+import { useAuth } from "../auth/AuthProviders"; // ⬅️ usa el provider nuevo
 
 const BRAND = "NardeliTicket";
 
@@ -18,25 +17,10 @@ export default function Navbar() {
   const [cartCount, setCartCount] = useState<number>(0);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // --- auth store ---
-  const { user, token, setAuth, logout } = useAuth();
+  // ✅ estado de sesión desde el AuthProvider
+  const { user, ready, logout } = useAuth();
   const [openUserMenu, setOpenUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
-
-  // Si hay token pero no tenemos user aún, pedimos /me
-  useEffect(() => {
-    (async () => {
-      if (token && !user) {
-        try {
-          const { user: u } = await getMe();
-          setAuth(u, token);
-        } catch {
-          // token inválido -> limpiar
-          logout();
-        }
-      }
-    })();
-  }, [token, user, setAuth, logout]);
 
   // cerrar dropdown al click fuera
   useEffect(() => {
@@ -112,11 +96,8 @@ export default function Navbar() {
             🛒<span className="nv__badge">{cartCount}</span>
           </Link>
 
-          {/* --- Si NO hay sesión -> botón login --- */}
-          {!token ? (
-            <Link to="/auth?tab=login" className="nv__login">Iniciar sesión</Link>
-          ) : (
-            // --- Si hay sesión -> menú de usuario ---
+          {/* ⬇️ FIX: si no hay user, mostramos "Iniciar sesión" (aunque ready sea false) */}
+          {user ? (
             <div className="nv__user" ref={userMenuRef}>
               <button
                 className="nv__userbtn"
@@ -133,16 +114,13 @@ export default function Navbar() {
               {openUserMenu && (
                 <div className="nv__menu" role="menu">
                   <Link to="/account" role="menuitem" onClick={() => setOpenUserMenu(false)}>Configuración</Link>
-
-                  {/* Mostrar “Panel Admin” solo si el rol es admin */}
                   {user?.role === "admin" && (
                     <Link to="/admin" role="menuitem" onClick={() => setOpenUserMenu(false)}>Panel Admin</Link>
                   )}
-
                   <button
                     role="menuitem"
-                    onClick={() => {
-                      logout();
+                    onClick={async () => {
+                      await logout();
                       setOpenUserMenu(false);
                       navigate("/");
                     }}
@@ -152,6 +130,8 @@ export default function Navbar() {
                 </div>
               )}
             </div>
+          ) : (
+            <Link to="/auth?tab=login" className="nv__login">Iniciar sesión</Link>
           )}
         </div>
       </div>

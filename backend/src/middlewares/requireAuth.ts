@@ -1,15 +1,32 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../utils/auth";
 
+/**
+ * Acepta tokens firmados con { sub, role } (nuevo) o { id, role } (legacy).
+ * Inyecta en req.user: { id: string, role?: string }
+ */
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
-    const auth = req.headers.authorization || "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+    const auth = (req.headers.authorization || "").trim();
+    if (!auth.toLowerCase().startsWith("bearer ")) {
+      return res.status(401).json({ error: "Missing token" });
+    }
+
+    const token = auth.slice(7).trim();
     if (!token) return res.status(401).json({ error: "Missing token" });
 
     const secret = process.env.JWT_SECRET!;
-    const payload = verifyToken(token, secret);
-    (req as any).user = payload; // { id, role }
+    const payload: any = verifyToken(token, secret); // puede traer sub o id
+
+    const userId = payload?.sub ?? payload?.id;
+    if (!userId) return res.status(401).json({ error: "Bad token payload" });
+
+    (req as any).user = {
+      id: String(userId),
+      role: payload?.role,
+      // agrega aquí otros campos si los firmas (email, name, etc.)
+    };
+
     next();
   } catch {
     return res.status(401).json({ error: "Invalid token" });

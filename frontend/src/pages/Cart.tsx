@@ -97,12 +97,12 @@ async function handleCheckout() {
     const bodyBase: CartPayload = { eventId, items, totals, sessionDate };
 
     // 1) Preflight: confirma totales en el servidor (centavos)
-    const { data: pre } = await api.post("/api/checkout/preflight", bodyBase);
+    const { data: pre } = await api.post("/checkout/preflight", bodyBase);
 
     // (opcional) podrías comparar y mostrar pre.pricing al usuario
 
     // 2) Crear sesión de checkout usando los totales confirmados
-    const { data } = await api.post("/api/checkout", {
+    const { data } = await api.post("/checkout", {
       ...bodyBase,
       pricing: pre?.pricing, // <--- totales confirmados en centavos
       holdGroupId: pre?.hold?.holdGroupId,

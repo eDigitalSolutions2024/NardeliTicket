@@ -8,20 +8,17 @@ import Navbar from "./components/Navbar";
 import AdminRoute from "./components/AdminRoute";
 import EventDetail from "./pages/EventDetail";
 import SeatSelectionPage from "./pages/SeatSelectionPage";
-import CartPage from "./pages/Cart"; // 👈 nuevo
-import CheckoutSuccess from "./pages/CheckoutSuccess";
-import CheckoutCancel from "./pages/CheckoutCancel";
+import CartPage from "./pages/Cart";
+import { useAuth } from "./auth/AuthProviders"; // ⬅️ importa el hook
 
 function RequireAuth({ children }: { children: JSX.Element }) {
-  const token = localStorage.getItem("token");
-  const hasToken = !!token && token !== "undefined" && token !== "null" && token.trim() !== "";
-  if (!hasToken) {
+  const { user, ready } = useAuth();              // ⬅️ usa el estado del provider
+  if (!ready) return null;                        // spinner si quieres
+  if (!user) {
     return <Navigate to="/auth?tab=login" replace state={{ redirectTo: "/cart" }} />;
   }
   return children;
 }
-
-
 
 export default function App() {
   return (
@@ -33,19 +30,15 @@ export default function App() {
         <Route path="/events" element={<EventsPage />} />
         <Route path="/events/:id" element={<EventDetail />} />
 
-        {/* 👉 Ruta de selección de asientos (sin props) */}
+        {/* Selección de asientos */}
         <Route path="/event/:id/seleccion" element={<SeatSelectionPage />} />
-        
 
         {/* Auth */}
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/login" element={<Navigate to="/auth?tab=login" replace />} />
         <Route path="/register" element={<Navigate to="/auth?tab=register" replace />} />
 
-
-
-
-        {/* Cart (recomendado protegido) */}
+        {/* Cart protegido */}
         <Route
           path="/cart"
           element={
@@ -55,10 +48,7 @@ export default function App() {
           }
         />
 
-        <Route path="/checkout/success" element={<CheckoutSuccess />} />
-        <Route path="/checkout/cancel" element={<CheckoutCancel />} />
-
-        {/* Admin protegido */}
+        {/* Admin protegido (si AdminRoute usa token/localStorage, actualízalo a useAuth también) */}
         <Route
           path="/admin"
           element={

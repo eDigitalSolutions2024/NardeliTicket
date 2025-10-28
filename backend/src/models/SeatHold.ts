@@ -32,9 +32,10 @@ const SeatHoldSchema = new Schema<ISeatHold>(
 SeatHoldSchema.index({ createdAt: 1 }, { expireAfterSeconds: 15 * 60 });
 
 // Evita que dos usuarios tengan el mismo asiento en "active"
+// ✅ Un solo índice parcial único
 SeatHoldSchema.index(
-  { eventId: 1, seatId: 1, status: 1 },
-  { unique: true, partialFilterExpression: { status: "active" } }
+  { eventId: 1, seatId: 1 }, // no incluimos status en la clave
+  { unique: true, partialFilterExpression: { status: { $in: ["active", "sold"] } } }
 );
 
 // Unicidad en SOLD

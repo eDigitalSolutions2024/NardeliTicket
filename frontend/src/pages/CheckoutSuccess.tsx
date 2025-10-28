@@ -14,11 +14,37 @@ function sanitizePhone(input: string): string {
   return (input || "").replace(/\D/g, "");
 }
 
+function isValidPhone(raw?: string): boolean {
+  const d = sanitizePhone(raw || "");
+  // válido si viene con lada (>=12 para MX 52 + 10) o al menos 10 (luego le agregamos 52)
+  return d.length >= 10;
+}
+
+function normalizeE164Mx(raw: string): string {
+  const d = sanitizePhone(raw);
+  if (d.length === 10) return `52${d}`; // si escriben 10 dígitos, asumimos MX
+  return d; // ya viene con lada
+}
+
+
 function buildWaUrl(message: string, phone?: string): string {
   const encoded = encodeURIComponent(message);
   const to = sanitizePhone(phone || "");
   return to ? `https://wa.me/${to}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
 }
+
+function getPhoneFromStorage(): string | null {
+  try {
+    const raw = localStorage.getItem("NT_PENDING_CHECKOUT");
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    // ajusta la ruta según lo que guardes en tu payload:
+    return obj?.buyer?.phone || obj?.phone || null;
+  } catch {
+    return null;
+  }
+}
+
 
 // 🔗 PDF por boleto: http://localhost:4000/api/checkout/tickets/<ticketId>.pdf
 /*function buildTicketPdfUrl(tid: string): string {
@@ -72,7 +98,13 @@ export default function CheckoutSuccess(): JSX.Element {
     state.ticketIds || ticketIdsFromQuery
   );
 
-  const [phone, setPhone] = useState<string>(sanitizePhone(state.phone || searchParams.get("phone") || ""));
+  const [phone, setPhone] = useState<string>(() => {
+    const fromState = sanitizePhone(state.phone || "");
+    const fromQuery = sanitizePhone(searchParams.get("phone") || "");
+    const fromStorage = sanitizePhone(getPhoneFromStorage() || "");
+    return fromState || fromQuery || fromStorage || "";
+  });
+
 
   // Fallback opcional: si tenemos orderId pero no ticketIds, intenta pedirlos al backend.
   useEffect(() => {
@@ -148,8 +180,10 @@ export default function CheckoutSuccess(): JSX.Element {
       setSendingWa(true);
       setSendErrWa(null);
 
-      const cleanPhone = sanitizePhone(phone);
-      if (!cleanPhone) throw new Error("No se recibió teléfono para WhatsApp.");
+      const cleanPhone = normalizeE164Mx(phone);
+      if (!isValidPhone(cleanPhone)) {
+        throw new Error("No se recibió teléfono para WhatsApp.");
+      }
       const ids = ticketIds || [];
       if (!ids.length) throw new Error("No hay ticketIds para enviar.");
 
@@ -240,13 +274,14 @@ export default function CheckoutSuccess(): JSX.Element {
 
         {/* Generar PDFs */}
         <div style={styles.actions}>
-          <button
-            onClick={sendTicketsViaWhatsApp}
-            style={styles.primaryBtn}
-            disabled={sendingWa || (!pdfUrls.length && !orderId)}
-          >
-            {sendingWa ? "Enviando por WhatsApp…" : "Enviar boletos por WhatsApp"}
-          </button>
+         <button
+          onClick={sendTicketsViaWhatsApp}
+          style={styles.primaryBtn}
+          disabled={sendingWa || !isValidPhone(phone) || (!pdfUrls.length && !orderId)}
+        >
+          {sendingWa ? "Enviando por WhatsApp..." : "Enviar boletos por WhatsApp"}
+        </button>
+
 
           <button onClick={handleOpenFirstPdf} style={styles.secondaryBtn} disabled={!pdfUrls.length}>
             Abrir primer PDF

@@ -9,6 +9,8 @@ import AdminRoute from "./components/AdminRoute";
 import EventDetail from "./pages/EventDetail";
 import SeatSelectionPage from "./pages/SeatSelectionPage";
 import CartPage from "./pages/Cart";
+import CheckoutSuccess from "./pages/CheckoutSuccess";
+import CheckoutCancel from "./pages/CheckoutCancel";
 import { useAuth } from "./auth/AuthProviders"; // ⬅️ importa el hook
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -38,6 +40,11 @@ export default function App() {
         <Route path="/login" element={<Navigate to="/auth?tab=login" replace />} />
         <Route path="/register" element={<Navigate to="/auth?tab=register" replace />} />
 
+
+        <Route path="/checkout/success" element={<CheckoutSuccess />} />
+         <Route path="/checkout/cancel" element={<CheckoutCancel />} />
+
+         
         {/* Cart protegido */}
         <Route
           path="/cart"

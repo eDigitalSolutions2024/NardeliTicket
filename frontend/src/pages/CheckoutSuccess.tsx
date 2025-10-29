@@ -13,71 +13,55 @@ type LocationState = {
 function sanitizePhone(input: string): string {
   return (input || "").replace(/\D/g, "");
 }
-
 function isValidPhone(raw?: string): boolean {
   const d = sanitizePhone(raw || "");
-  // válido si viene con lada (>=12 para MX 52 + 10) o al menos 10 (luego le agregamos 52)
-  return d.length >= 10;
+  return d.length >= 10; // 10 sin lada (MX) o >=12 con lada
 }
-
 function normalizeE164Mx(raw: string): string {
   const d = sanitizePhone(raw);
-  if (d.length === 10) return `52${d}`; // si escriben 10 dígitos, asumimos MX
-  return d; // ya viene con lada
+  if (d.length === 10) return `52${d}`;
+  return d;
 }
-
-
 function buildWaUrl(message: string, phone?: string): string {
   const encoded = encodeURIComponent(message);
   const to = sanitizePhone(phone || "");
   return to ? `https://wa.me/${to}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
 }
-
 function getPhoneFromStorage(): string | null {
   try {
     const raw = localStorage.getItem("NT_PENDING_CHECKOUT");
     if (!raw) return null;
     const obj = JSON.parse(raw);
-    // ajusta la ruta según lo que guardes en tu payload:
     return obj?.buyer?.phone || obj?.phone || null;
   } catch {
     return null;
   }
 }
 
-
 // 🔗 PDF por boleto: http://localhost:4000/api/checkout/tickets/<ticketId>.pdf
-/*function buildTicketPdfUrl(tid: string): string {
-  return `${API_BASE}/api/checkout/tickets/${tid}.pdf`;
-}*/
-// Reemplaza tu buildTicketPdfUrl actual
 function buildTicketPdfUrl(tid: string): string {
-  // API_BASE podría ser "http://localhost:4000/api" o "http://localhost:4000"
-  const base = API_BASE.replace(/\/+$/, ""); // quita / final
-  // Si ya termina en /api, no lo agregues de nuevo
+  const base = API_BASE.replace(/\/+$/, "");
   const hasApi = /\/api$/.test(base);
   const root = hasApi ? base : `${base}/api`;
   return `${root}/checkout/tickets/${tid}.pdf`;
 }
 
-
-
-export default function CheckoutSuccess(): JSX.Element {
+export default function CheckoutSuccess() {
   const location = useLocation();
   const state = (location.state as LocationState) || {};
   const [searchParams] = useSearchParams();
+
   const [generatedUrls, setGeneratedUrls] = useState<string[]>([]);
   const [loadingGen, setLoadingGen] = useState(false);
   const [errorGen, setErrorGen] = useState<string | null>(null);
-  // ⬇️ NUEVOS estados para el envío por WhatsApp via backend
+
+  // WhatsApp
   const [sendingWa, setSendingWa] = useState(false);
   const [sentOkWa, setSentOkWa] = useState<boolean | null>(null);
   const [sendErrWa, setSendErrWa] = useState<string | null>(null);
-  // Para asegurar que se dispare solo una vez automáticamente
   const alreadySentRef = useRef(false);
 
-
-  // orderId y/o ticketIds pueden venir por state o query (?orderId=..., ?ticketId=... o ?ticketIds=a,b,c)
+  // orderId puede venir por state o query (?orderId=?)
   const orderId =
     state.orderId ||
     state.reservaId ||
@@ -86,9 +70,10 @@ export default function CheckoutSuccess(): JSX.Element {
     searchParams.get("reservaId") ||
     undefined;
 
+  // ticketIds por query (?ticketIds=a,b,c) o (?ticketId=uno)
   const ticketIdsFromQuery = (() => {
     const one = searchParams.get("ticketId");
-    const many = searchParams.get("ticketIds"); // coma-separados
+    const many = searchParams.get("ticketIds");
     if (one) return [one];
     if (many) return many.split(",").map((s) => s.trim()).filter(Boolean);
     return undefined;
@@ -105,42 +90,82 @@ export default function CheckoutSuccess(): JSX.Element {
     return fromState || fromQuery || fromStorage || "";
   });
 
-
-  // Fallback opcional: si tenemos orderId pero no ticketIds, intenta pedirlos al backend.
+  // 1) Polling corto para esperar al webhook (si hay orderId y aún no hay ticketIds)
   useEffect(() => {
     let cancelled = false;
-    async function fetchTicketIds() {
-      if (!orderId || (ticketIds && ticketIds.length)) return;
+    if (!orderId || (ticketIds && ticketIds.length)) return;
+
+    let attempts = 0;
+    const POLL_LIMIT = 5;
+    const POLL_MS = 1500;
+
+    async function tryFetchTickets() {
+      attempts++;
       try {
-        // Espera que el backend exponga: GET /api/orders/:orderId/tickets -> string[]
-        const { data } = await api.get<string[]>(`/api/checkout/orders/${orderId}/tickets`);
-        if (!cancelled && Array.isArray(data) && data.length) setTicketIds(data);
+        const { data } = await api.get<string[]>(`/checkout/orders/${orderId}/tickets`);
+        if (!cancelled && Array.isArray(data) && data.length) {
+          setTicketIds(data);
+          return; // listo, ya no seguir
+        }
       } catch {
-        // Silencioso: si no existe el endpoint aún, seguimos sin bloquear la vista
+        // ignorar, reintenta
+      }
+      if (!cancelled && attempts < POLL_LIMIT) {
+        setTimeout(tryFetchTickets, POLL_MS);
       }
     }
-    fetchTicketIds();
-    return () => {
-      cancelled = true;
-    };
+
+    tryFetchTickets();
+    return () => { cancelled = true; };
   }, [orderId, ticketIds]);
 
-  // ⬇️ Enviar automáticamente una vez si tenemos phone + ticketIds
+  // 2) Si ya tengo ticketIds pero aún no tengo PDFs generados, intenta generarlos 1 vez
+  const triedAutoGenRef = useRef(false);
+  useEffect(() => {
+    if (triedAutoGenRef.current) return;
+    if (!orderId) return;
+    if (!ticketIds || ticketIds.length === 0) return;
+    if (generatedUrls.length > 0) return;
+
+    triedAutoGenRef.current = true;
+    (async () => {
+      try {
+        setLoadingGen(true);
+        const { data } = await api.post(`/api/checkout/orders/${orderId}/tickets/generate`);
+        const urls: string[] = Array.isArray(data?.files)
+          ? data.files.map((f: any) => f.url).filter(Boolean)
+          : [];
+        const ids: string[] = Array.isArray(data?.files)
+          ? data.files.map((f: any) => f.ticketId).filter(Boolean)
+          : [];
+        if (urls.length) setGeneratedUrls(urls);
+        if (ids.length) setTicketIds(ids);
+      } catch (e: any) {
+        // no bloquear la vista; el usuario puede usar el botón "Generar PDFs"
+      } finally {
+        setLoadingGen(false);
+      }
+    })();
+  }, [orderId, ticketIds, generatedUrls.length]);
+
+  // 3) Envío automático por WhatsApp SOLO cuando hay phone y (ticketIds o pdfUrls)
   useEffect(() => {
     if (alreadySentRef.current) return;
     const ok =
-      (ticketIds?.length || 0) > 0 &&
-      !!sanitizePhone(phone || "");
+      !!sanitizePhone(phone || "") &&
+      ( (ticketIds?.length || 0) > 0 || (generatedUrls.length > 0) );
+
     if (ok) {
       alreadySentRef.current = true;
       void sendTicketsViaWhatsApp();
     }
-  }, [ticketIds, phone]);
+  }, [ticketIds, generatedUrls, phone]);
 
- const pdfUrls = useMemo<string[]>(() => {
-   if (generatedUrls.length) return generatedUrls;
-   return (ticketIds || []).map(buildTicketPdfUrl);
- }, [generatedUrls, ticketIds]);
+  // URLs de PDF a mostrar (si el backend devuelve urls, se usan; si no, se construyen)
+  const pdfUrls = useMemo<string[]>(() => {
+    if (generatedUrls.length) return generatedUrls;
+    return (ticketIds || []).map(buildTicketPdfUrl);
+  }, [generatedUrls, ticketIds]);
 
   const messageText = useMemo<string>(() => {
     const header = `¡Hola! Aquí están tus boletos de NardeliTicket 🎟️`;
@@ -174,7 +199,7 @@ export default function CheckoutSuccess(): JSX.Element {
     }
   };
 
-  // ⬇️ Enviar por WhatsApp usando TU BACKEND (WhatsApp Cloud API)
+  // WhatsApp vía backend
   async function sendTicketsViaWhatsApp(): Promise<void> {
     try {
       setSendingWa(true);
@@ -187,7 +212,7 @@ export default function CheckoutSuccess(): JSX.Element {
       const ids = ticketIds || [];
       if (!ids.length) throw new Error("No hay ticketIds para enviar.");
 
-      await api.post("/api/whatsapp/send-tickets", {
+      await api.post("/whatsapp/send-tickets", {
         phone: cleanPhone,
         ticketIds: ids,
         introMessage:
@@ -200,24 +225,21 @@ export default function CheckoutSuccess(): JSX.Element {
       setSentOkWa(false);
       setSendErrWa(
         err?.response?.data?.error ||
-        err?.message ||
-        "Error al enviar por WhatsApp"
+          err?.message ||
+          "Error al enviar por WhatsApp"
       );
     } finally {
       setSendingWa(false);
     }
   }
 
-
-  // Genera y guarda los PDFs; devuelve URLs públicas
+  // Generar PDFs manualmente (botón)
   const handleGeneratePdfs = async (): Promise<void> => {
     if (!orderId) return;
     setLoadingGen(true);
     setErrorGen(null);
     try {
-      // POST /checkout/orders/:orderId/tickets/generate
-      const { data } = await api.post(`/api/checkout/orders/${orderId}/tickets/generate`);
-      // Esperado: { files: [{ ticketId, fileName, url }], count, orderId }
+      const { data } = await api.post(`/checkout/orders/${orderId}/tickets/generate`);
       const urls: string[] = Array.isArray(data?.files)
         ? data.files.map((f: any) => f.url).filter(Boolean)
         : [];
@@ -245,14 +267,13 @@ export default function CheckoutSuccess(): JSX.Element {
       <div style={styles.card}>
         <div style={styles.icon}>✅</div>
         <h1 style={styles.title}>¡Pago confirmado!</h1>
-        {sendingWa && <p>Enviando tus boletos por WhatsApp…</p>}
 
+        {sendingWa && <p>Enviando tus boletos por WhatsApp…</p>}
         {sentOkWa === true && (
           <p style={{ color: "#16a34a", marginTop: 8 }}>
             ✅ Boletos enviados por WhatsApp.
           </p>
         )}
-
         {sentOkWa === false && (
           <div style={{ ...styles.alert, marginTop: 8 }}>
             ❌ No se pudieron enviar por WhatsApp.<br />
@@ -262,6 +283,7 @@ export default function CheckoutSuccess(): JSX.Element {
             </button>
           </div>
         )}
+
         <p style={styles.subtitle}>
           Tu compra se realizó con éxito. {orderId ? `Folio: #${orderId}` : ""}
         </p>
@@ -272,30 +294,39 @@ export default function CheckoutSuccess(): JSX.Element {
           </div>
         )}
 
-        {/* Generar PDFs */}
+        {/* Acciones principales */}
         <div style={styles.actions}>
-         <button
-          onClick={sendTicketsViaWhatsApp}
-          style={styles.primaryBtn}
-          disabled={sendingWa || !isValidPhone(phone) || (!pdfUrls.length && !orderId)}
-        >
-          {sendingWa ? "Enviando por WhatsApp..." : "Enviar boletos por WhatsApp"}
-        </button>
+          {/* Generar PDFs */}
+          <button
+            onClick={handleGeneratePdfs}
+            style={styles.secondaryBtn}
+            disabled={!orderId || loadingGen}
+            title={!orderId ? "Se requiere orderId" : undefined}
+          >
+            {loadingGen ? "Generando PDFs..." : "Generar PDFs (si no aparecen)"}
+          </button>
 
+          <button
+            onClick={handleSendWhatsApp}
+            style={styles.primaryBtn}
+            disabled={sendingWa || !isValidPhone(phone) || (!pdfUrls.length && !ticketIds?.length)}
+          >
+            {sendingWa ? "Enviando por WhatsApp..." : "Enviar boletos por WhatsApp"}
+          </button>
 
           <button onClick={handleOpenFirstPdf} style={styles.secondaryBtn} disabled={!pdfUrls.length}>
             Abrir primer PDF
-          </button> 
+          </button>
           <button onClick={handleCopyLinks} style={styles.secondaryBtn} disabled={!pdfUrls.length}>
             Copiar links
           </button>
         </div>
 
-
         {errorGen && (
           <div style={{ ...styles.alert, marginTop: 10 }}>{errorGen}</div>
         )}
 
+        {/* Teléfono */}
         <div style={styles.section}>
           <label style={styles.label}>Enviar por WhatsApp a:</label>
           <div style={styles.row}>
@@ -314,18 +345,7 @@ export default function CheckoutSuccess(): JSX.Element {
           </small>
         </div>
 
-        <div style={styles.actions}>
-          <button onClick={handleSendWhatsApp} style={styles.primaryBtn} disabled={!pdfUrls.length && !orderId}>
-            Enviar boletos por WhatsApp
-          </button>
-          <button onClick={handleOpenFirstPdf} style={styles.secondaryBtn} disabled={!pdfUrls.length}>
-            Abrir primer PDF
-          </button>
-          <button onClick={handleCopyLinks} style={styles.secondaryBtn} disabled={!pdfUrls.length}>
-            Copiar links
-          </button>
-        </div>
-
+        {/* Lista de PDFs */}
         {!!pdfUrls.length && (
           <div style={{ marginTop: 16 }}>
             <div style={{ fontWeight: 600, marginBottom: 6 }}>Boletos generados:</div>
@@ -349,8 +369,6 @@ export default function CheckoutSuccess(): JSX.Element {
     </div>
   );
 }
-
-
 
 const styles: Record<string, React.CSSProperties> = {
   wrap: {

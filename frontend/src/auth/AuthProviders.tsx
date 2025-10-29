@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { api, setAccessToken } from "../api/client";
+import { api, bootstrapSessionSilently, setAccessToken } from "../api/client";
 
 type User = { id: string; name?: string; email?: string; role?: string };
+
 type Ctx = {
   user: User | null;
   ready: boolean;
@@ -16,40 +17,44 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
 
-  // Rehidratación inicial: /me → si 401 → /auth/refresh → /me
+  // Rehidratación inicial (una sola vez):
+  // 1) intenta refresh silencioso (usa cookie httpOnly)
+  // 2) si ok, llama /auth/me; si falla, queda sin sesión (user=null)
   useEffect(() => {
+    let alive = true;
     (async () => {
       try {
-        const me = await api.get("/auth/me");
-        setUser(me.data.user ?? me.data);
+        await bootstrapSessionSilently();           // ← usa axios "crudo" dentro de client.ts
+        const me = await api.get("/auth/me");       // ← ya hay accessToken en memoria si lo anterior fue ok
+        if (alive) setUser(me.data.user ?? me.data);
       } catch {
-        try {
-          const r = await api.post("/auth/refresh");
-          setAccessToken(r.data.accessToken);
-          const me2 = await api.get("/auth/me");
-          setUser(me2.data.user ?? me2.data);
-        } catch {
+        if (alive) {
           setAccessToken(null);
           setUser(null);
         }
       } finally {
-        setReady(true);
+        if (alive) setReady(true);
       }
     })();
-  }, []);
+    return () => { alive = false; };
+  }, []); // 👈 dependencias vacías para evitar loops
 
-  // 👇 ESTE login es el que debe usar tu pantalla de login
+  // Login "oficial" para la pantalla de login
   async function login(email: string, password: string) {
     const r = await api.post("/auth/login", { email, password });
     // backend puede responder {accessToken} o {token}
-    setAccessToken(r.data.accessToken ?? r.data.token);
-    setUser(r.data.user);
+    setAccessToken(r.data.accessToken ?? r.data.token ?? null);
+    const me = await api.get("/auth/me");  // ya con Authorization
+    setUser(me.data.user ?? me.data);
   }
 
   async function logout() {
-    await api.post("/auth/logout");
-    setAccessToken(null);
-    setUser(null);
+    try {
+      await api.post("/auth/logout");
+    } finally {
+      setAccessToken(null);
+      setUser(null);
+    }
   }
 
   const value = useMemo(() => ({ user, ready, login, logout }), [user, ready]);

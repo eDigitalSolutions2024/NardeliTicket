@@ -1,33 +1,43 @@
+// src/middlewares/requireAuth.ts
 import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../utils/auth";
 
-/**
- * Acepta tokens firmados con { sub, role } (nuevo) o { id, role } (legacy).
- * Inyecta en req.user: { id: string, role?: string }
- */
+type JwtPayloadLite = { sub?: string; id?: string; role?: string; email?: string; name?: string };
+
+function extractBearer(req: Request): string | null {
+  const hdr = (req.headers.authorization || "").trim();
+  if (!hdr) return null;
+  const [scheme, ...rest] = hdr.split(/\s+/);
+  if (!scheme || scheme.toLowerCase() !== "bearer") return null;
+  const token = rest.join(" ").trim().replace(/^"(.*)"$/, "$1");
+  if (!token || token === "undefined" || token === "null") return null;
+  return token;
+}
+
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
-    const auth = (req.headers.authorization || "").trim();
-    if (!auth.toLowerCase().startsWith("bearer ")) {
-      return res.status(401).json({ error: "Missing token" });
+    const secret = process.env.JWT_SECRET;
+    if (!secret) {
+      console.error("JWT_SECRET is not set");
+      return res.status(500).json({ error: "server_misconfigured" });
     }
 
-    const token = auth.slice(7).trim();
+    let token = extractBearer(req);
     if (!token) return res.status(401).json({ error: "Missing token" });
 
-    const secret = process.env.JWT_SECRET!;
-    const payload: any = verifyToken(token, secret); // puede traer sub o id
-
+    const payload = verifyToken<JwtPayloadLite>(token, secret);
     const userId = payload?.sub ?? payload?.id;
     if (!userId) return res.status(401).json({ error: "Bad token payload" });
 
     (req as any).user = {
       id: String(userId),
       role: payload?.role,
-      // agrega aquí otros campos si los firmas (email, name, etc.)
+      email: payload?.email,
+      name: payload?.name,
     };
+    (req as any).authToken = token;
 
-    next();
+    return next();
   } catch {
     return res.status(401).json({ error: "Invalid token" });
   }

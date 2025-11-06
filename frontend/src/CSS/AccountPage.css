@@ -1,0 +1,232 @@
+:root {
+  --brand: #0c3c73;         /* azul del navbar */
+  --brand-2: #0a2f5a;
+  --ink: #111827;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --bg: #f8fafc;
+  --card-bg: #fff;
+  --focus: #2563eb;
+  --radius: 14px;
+  --shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
+}
+
+/* ----- Layout general ----- */
+.acc-wrap {
+  max-width: 1000px;
+  margin: 32px auto 56px;
+  padding: 0 20px;
+}
+
+/* ----- Títulos ----- */
+.acc-title { 
+  display: flex; 
+  align-items: center; 
+  gap: 14px;
+  margin: 0 0 8px; 
+  font-size: 1.8rem; 
+  line-height: 1.25;
+  color: var(--ink);
+  font-weight: 800;
+}
+.acc-sub { 
+  margin: 2px 0 22px; 
+  line-height: 1.6; 
+  color: var(--muted);
+}
+
+/* ----- Tarjetas ----- */
+.acc-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  margin-top: 24px;
+}
+.acc-card h3 {
+  margin: 0 0 16px;
+  color: var(--ink);
+  font-size: 1.15rem;
+}
+
+/* ----- Chip/Avatar inicial ----- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #fff;
+  font-weight: 800;
+  box-shadow: var(--shadow);
+  font-size: 1rem;
+}
+.acc-row { 
+  display: flex; 
+  align-items: center; 
+  gap: 14px; 
+}
+.note { color: var(--muted); font-size: .9rem; }
+
+/* ----- Separador ----- */
+.acc-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 18px 0;
+}
+
+/* ----- Grids ----- */
+.acc-grid { 
+  display: grid; 
+  column-gap: 18px; 
+  row-gap: 16px; 
+}
+.acc-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.acc-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+@media (max-width: 920px) {
+  .acc-grid.cols-2, 
+  .acc-grid.cols-3 { grid-template-columns: 1fr; }
+}
+
+/* ----- Campos ----- */
+.acc-field label {
+  display: block;
+  font-size: .9rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.acc-field input {
+  width: 100%;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 1rem;
+  outline: none;
+  transition: border .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.acc-field input:focus {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
+  background: #fff;
+}
+
+/* ----- Metadatos ----- */
+.acc-meta { 
+  display: grid; 
+  gap: 8px; 
+  margin-top: 14px; 
+  font-size: .95rem; 
+  color: var(--muted);
+}
+.acc-meta b { color: var(--ink); }
+
+.badge-role {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: .80rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #10b981, #059669); /* verde */
+}
+
+/* ----- Botones ----- */
+.acc-actions { 
+  margin-top: 16px; 
+  display: flex; 
+  gap: 12px; 
+}
+.btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter .15s ease, transform .02s ease, box-shadow .15s ease;
+}
+.btn:active { transform: translateY(1px); }
+.btn[disabled] { opacity: .6; cursor: not-allowed; }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(12, 60, 115, .25);
+}
+.btn-primary:hover { filter: brightness(1.03); }
+
+.btn-outline {
+  background: transparent;
+  color: var(--brand);
+  border: 1px solid var(--brand);
+}
+.btn-outline:hover { filter: brightness(1.05); }
+
+/* ==== Ajustes finos para NardeliTicket ==== */
+
+/* Si el navbar es fixed/sticky y tapa el título, descomenta: */
+/* .acc-wrap { padding-top: 72px; }  */
+
+/* Encabezados de tarjeta más notorios */
+.acc-card h3 {
+  letter-spacing: .2px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+/* Inputs: placeholder y hover */
+.acc-field input::placeholder { color: #9aa3af; }
+.acc-field input:hover { border-color: #d1d5db; }
+
+/* Botones primarios: foco y active */
+.btn-primary:focus {
+  box-shadow: 0 0 0 4px rgba(12,60,115,.18);
+}
+.btn-primary:active {
+  filter: brightness(.97);
+}
+
+/* Botón outline: foco/hover */
+.btn-outline:focus { box-shadow: 0 0 0 3px rgba(12,60,115,.15); }
+.btn-outline:hover { background: rgba(12,60,115,.05); }
+
+/* Badge de rol con mejor alineación en una sola línea */
+.badge-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* Meta: usa puntitos sutiles entre items en pantallas amplias */
+@media (min-width: 920px) {
+  .acc-meta {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    align-items: center;
+  }
+  .acc-meta > * + *::before {
+    content: "•";
+    margin: 0 10px;
+    color: #c0c7d2;
+  }
+}
+
+/* Separación inferior de tarjetas para que no se “junten” */
+.acc-card { margin-bottom: 14px; }
+
+/* micro-anim para entrada */
+@keyframes accFadeIn { from { opacity:.0; transform: translateY(4px)} to { opacity:1; transform:none } }
+.acc-card { animation: accFadeIn .18s ease-out; }
+
+/* Compacta en móviles muy chicos */
+@media (max-width: 380px) {
+  .btn { width: 100%; text-align: center; }
+  .acc-actions { flex-direction: column; }
+}

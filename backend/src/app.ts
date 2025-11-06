@@ -11,7 +11,7 @@ import checkoutRoutes from "./routes/checkout.routes";
 import webhookRoutes from "./routes/webhooks.routes";
 import whatsappRoutes from "./routes/whatsapp.routes";
 import adminSalesRoutes from "./routes/admin.sales.routes";
-
+import accountRoutes from "./routes/account.routes";
 const app = express();
 
 /** 1) CORS con credenciales y origin explícito (usa FRONTEND_URL si la tienes) */
@@ -42,11 +42,17 @@ app.use("/api/checkout", checkoutRoutes);
 app.use("/api/events", eventsRouter);
 app.use("/api/admin", adminSalesRoutes);
 app.use("/api/whatsapp", whatsappRoutes);
+app.use("/api/account", accountRoutes);
 
 /** 7) Estáticos (PDFs, etc.) */
 app.use(
-  "/files",
-  express.static(path.join(__dirname, "tickets"), { fallthrough: true })
+  "/files/tickets",
+  express.static(path.join(__dirname, "tickets"), {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith(".pdf")) res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    },
+  })
 );
 
 /** 8) Healthcheck */

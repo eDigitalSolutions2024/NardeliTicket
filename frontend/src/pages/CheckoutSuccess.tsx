@@ -131,7 +131,7 @@ export default function CheckoutSuccess() {
     (async () => {
       try {
         setLoadingGen(true);
-        const { data } = await api.post(`/api/checkout/orders/${orderId}/tickets/generate`);
+        const { data } = await api.post(`/checkout/orders/${orderId}/tickets/generate`);
         const urls: string[] = Array.isArray(data?.files)
           ? data.files.map((f: any) => f.url).filter(Boolean)
           : [];
@@ -344,20 +344,44 @@ export default function CheckoutSuccess() {
             Ingresa el número con lada (ej. México: 52). Se enviará un mensaje con los enlaces directos a los PDF.
           </small>
         </div>
+{/* Lista de PDFs (con vista previa) */}
+{!!pdfUrls.length && (
+  <div style={{ marginTop: 16 }}>
+    <div style={{ fontWeight: 600, marginBottom: 6, textAlign: "center" }}>
+      Boletos generados:
+    </div>
 
-        {/* Lista de PDFs */}
-        {!!pdfUrls.length && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>Boletos generados:</div>
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {pdfUrls.map((u) => (
-                <li key={u} style={{ wordBreak: "break-all" }}>
-                  <a href={u} target="_blank" rel="noreferrer">{u}</a>
-                </li>
-              ))}
-            </ul>
+    {/* usa layout centrado si hay 1 solo pdf */}
+    <div style={pdfUrls.length === 1 ? styles.pdfGridSingle : styles.pdfGrid}>
+      {pdfUrls.map((u) => (
+        <div key={u} style={pdfUrls.length === 1 ? styles.pdfCardLg : styles.pdfCard}>
+          <object
+            data={`${u}#view=FitH&toolbar=0&navpanes=0`}
+            type="application/pdf"
+            width="100%"
+            height="260"
+          >
+            <div style={{ padding: 12, fontSize: 14, textAlign: "center" }}>
+              No se pudo previsualizar el PDF.<br/>
+              <a href={u} target="_blank" rel="noreferrer">Abrir en nueva pestaña</a>
+            </div>
+          </object>
+
+          <div style={styles.pdfActions}>
+            <a href={u} target="_blank" rel="noreferrer" style={styles.secondaryBtnSmall}>
+              Abrir
+            </a>
+            <a href={u} download style={styles.primaryLinkBtn}>
+              Descargar
+            </a>
           </div>
-        )}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+
 
         <div style={styles.footerBox}>
           <p style={styles.footerText}>
@@ -443,4 +467,73 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 12,
   },
   linkHome: { textDecoration: "none", color: "#2563eb", fontWeight: 600 },
+ 
+pdfGrid: {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+  gap: 12,
+},
+
+// centrado para 1 solo PDF
+pdfGridSingle: {
+  display: "grid",
+  gridTemplateColumns: "minmax(280px, 420px)", // ancho deseado
+  justifyContent: "center",                     // ← centra la columna
+  gap: 12,
+},
+
+pdfCard: {
+  border: "1px solid #e5e7eb",
+  borderRadius: 12,
+  overflow: "hidden",
+  background: "#fff",
+  boxShadow: "0 4px 14px rgba(0,0,0,.06)",
+  display: "flex",
+  flexDirection: "column",
+},
+
+// un poco más ancha/alta cuando es única
+pdfCardLg: {
+  border: "1px solid #e5e7eb",
+  borderRadius: 12,
+  overflow: "hidden",
+  background: "#fff",
+  boxShadow: "0 6px 18px rgba(0,0,0,.08)",
+  display: "flex",
+  flexDirection: "column",
+  width: "100%",
+},
+
+pdfActions: {
+  display: "flex",
+  gap: 8,
+  padding: 10,
+  borderTop: "1px solid #eef2f7",
+  justifyContent: "space-between",
+},
+
+secondaryBtnSmall: {
+  display: "inline-block",
+  padding: "8px 10px",
+  borderRadius: 10,
+  background: "#f3f4f6",
+  color: "#111827",
+  fontWeight: 600,
+  border: "1px solid #e5e7eb",
+  textDecoration: "none",
+},
+
+primaryLinkBtn: {
+  display: "inline-block",
+  padding: "8px 10px",
+  borderRadius: 10,
+  background: "#2563eb",
+  color: "#fff",
+  fontWeight: 700,
+  border: "1px solid #1e40af",
+  textDecoration: "none",
+},
+
+
+
 };

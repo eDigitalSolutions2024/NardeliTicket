@@ -1,3 +1,4 @@
+// src/controllers/checkout.controller.ts
 import { Request, Response } from "express";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
@@ -9,8 +10,6 @@ import { ensureTicketPdf, ticketFileName } from "../utils/tickets";
 
 // ---------- Utilidades de pricing (centavos) ----------
 const SERVICE_FEE_PCT = 5;
-
-
 
 function zonePriceCentsFromEvent(eventDoc: any, zoneId: string): number {
   const key = String(zoneId || "").toLowerCase(); // "vip" | "oro"
@@ -37,7 +36,6 @@ function priceCentsForItem(eventDoc: any, it: any): number {
   return 0;
 }
 
-
 function computePricingCents(eventDoc: any, items: Array<any>) {
   let subtotalCents = 0;
   for (const it of items) {
@@ -60,7 +58,6 @@ function computePricingCents(eventDoc: any, items: Array<any>) {
     servicePct: SERVICE_FEE_PCT,
   };
 }
-
 
 // ---------- Handler: PRE-FLIGHT ----------
 export const preflightCheckout = async (req: Request & { user?: any }, res: Response) => {
@@ -91,10 +88,6 @@ export const preflightCheckout = async (req: Request & { user?: any }, res: Resp
     return res.status(500).json({ error: "preflight_failed", message: err.message });
   }
 };
-
-
-
-
 
 /** POST /api/checkout */
 export const createCheckout = async (req: Request & { user?: any }, res: Response) => {
@@ -135,7 +128,7 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
       statusTimeline: [{ status: "pending_payment", at: new Date() }],
     });
 
-  // Agrupar por zona para líneas de "entradas"
+    // Agrupar por zona para líneas de "entradas"
     const zoneAgg = new Map<string, { qty: number; unit_amount: number; tableNames: Set<string> }>();
     for (const it of items) {
       const qty = Array.isArray(it.seatIds) ? it.seatIds.length : 0;
@@ -150,7 +143,6 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
       current.tableNames.add(String(it.tableId));
       zoneAgg.set(zoneKey, current);
     }
-
 
     const line_items: any[] = [];
 
@@ -220,8 +212,6 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
   }
 };
 
-
-
 /**
  * GET /api/tickets/:ticketId.pdf
  * Genera un PDF de UN boleto (ticketId) buscando dentro de la colección Order.
@@ -234,7 +224,7 @@ export async function streamSingleTicketPdf(req: Request, res: Response) {
     const order = await Order.findOne({ "tickets.ticketId": ticketId }).lean();
     if (!order) return res.status(404).json({ message: "Boleto no encontrado" });
 
-    const ticket = (order.tickets || []).find(t => String(t.ticketId) === String(ticketId));
+    const ticket = (order.tickets || []).find((t) => String(t.ticketId) === String(ticketId));
     if (!ticket) return res.status(404).json({ message: "Boleto no encontrado" });
 
     // 2) Carga (opcional) del evento para encabezado
@@ -252,7 +242,7 @@ export async function streamSingleTicketPdf(req: Request, res: Response) {
     doc.pipe(res);
 
     // Base pública para QR/links
-    const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || "https://localhost:5173";
+    const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || "http://localhost:5173";
 
     // URL de verificación (ajusta al endpoint real si ya lo tienes)
     const verifyUrl = `${PUBLIC_BASE}/tickets/verify?oid=${order._id}&tid=${ticketId}`;
@@ -270,13 +260,17 @@ export async function streamSingleTicketPdf(req: Request, res: Response) {
 
     // ------- Render del boleto -------
     // Encabezado
-    doc.fontSize(22).fillColor("#111").text("NardeliTicket");
-    const eventTitle = event?.title || event?.name || "Evento";
-    const eventDate  = event?.date || event?.fecha;
-    const eventLoc   = event?.location || event?.lugar;
+    const eventTitle = event?.title || "Evento";
+    const eventDate =
+      order.sessionDate || event?.sessions?.[0]?.date || null;
+    const eventLoc = [event?.venue, event?.city].filter(Boolean).join(", ");
 
-    doc.moveDown(0.3).fontSize(14).fillColor("#444")
-       .text(`${eventTitle}  |  Folio: #${order._id}`);
+    doc.fontSize(22).fillColor("#111").text("NardeliTicket");
+    doc
+      .moveDown(0.3)
+      .fontSize(14)
+      .fillColor("#444")
+      .text(`${eventTitle}  |  Folio: #${order._id}`);
 
     if (eventDate) {
       const f = new Date(eventDate).toLocaleString("es-MX");
@@ -288,24 +282,33 @@ export async function streamSingleTicketPdf(req: Request, res: Response) {
     doc.moveDown();
 
     // Tarjeta
-    const cardX = 36, cardY = 140, cardW = doc.page.width - 72, cardH = 170;
-    doc.roundedRect(cardX, cardY, cardW, cardH, 10).strokeColor("#e5e7eb").lineWidth(1.5).stroke();
+    const cardX = 36,
+      cardY = 140,
+      cardW = doc.page.width - 72,
+      cardH = 170;
+    doc
+      .roundedRect(cardX, cardY, cardW, cardH, 10)
+      .strokeColor("#e5e7eb")
+      .lineWidth(1.5)
+      .stroke();
     doc.fontSize(18).fillColor("#111").text("Boleto", cardX + 12, cardY + 12);
 
     doc.fontSize(12).fillColor("#333");
     doc.text(`Ticket ID: ${ticket.ticketId}`, cardX + 12, cardY + 40);
-    doc.text(`Zona: ${ticket.zoneId}`,        cardX + 12, cardY + 58);
-    doc.text(`Mesa: ${ticket.tableId}`,       cardX + 12, cardY + 76);
-    doc.text(`Asiento: ${ticket.seatId}`,     cardX + 12, cardY + 94);
+    doc.text(`Zona: ${ticket.zoneId}`, cardX + 12, cardY + 58);
+    doc.text(`Mesa: ${ticket.tableId}`, cardX + 12, cardY + 76);
+    doc.text(`Asiento: ${ticket.seatId}`, cardX + 12, cardY + 94);
 
     const qrBuf = await toQrBuf(verifyUrl);
     const qrSize = 170;
     doc.image(qrBuf, cardX + cardW - qrSize - 12, cardY + 12, { width: qrSize, height: qrSize });
 
-    doc.fillColor("#6b7280").fontSize(10).text(
-      `Escanea el QR para validar tu boleto.`,
-      cardX + 12, cardY + cardH + 12, { width: cardW - 24 }
-    );
+    doc
+      .fillColor("#6b7280")
+      .fontSize(10)
+      .text(`Escanea el QR para validar tu boleto.`, cardX + 12, cardY + cardH + 12, {
+        width: cardW - 24,
+      });
 
     doc.end();
   } catch (err) {
@@ -323,25 +326,89 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
       return res.status(400).json({ message: "La orden no está pagada" });
     }
 
-    // trae asientos vendidos ligados a la orden
-    const seats = await SeatHold.find({ order: orderId, status: "sold" }).lean();
+    // 1) Cargar evento para título/fecha/lugar
+    const event = order.eventId ? await Event.findById(order.eventId).lean() : null;
 
-    // si usas `order.tickets` con ticketId, úsalo; si no, derivamos del seat._id
-    const tickets = (order.tickets && order.tickets.length)
-      ? order.tickets.map((t: any) => ({ ticketId: t.ticketId, seatId: t.seatId }))
-      : seats.map((s: any) => ({ ticketId: String(s._id), seatId: s._id }));
+    // 2) Asientos ligados a la orden (usa el campo correcto: orderId)
+    const seats = await SeatHold.find({ orderId, status: "sold" }).lean();
+
+    // 3) Tickets (de order.tickets o derivados de seats)
+    const tickets =
+      order.tickets && order.tickets.length
+        ? order.tickets.map((t: any) => ({
+            ticketId: String(t.ticketId),
+            seatId: String(t.seatId),
+            tableId: t.tableId,
+            zoneId: t.zoneId,
+          }))
+        : seats.map((s: any) => ({
+            ticketId: String(s._id),
+            seatId: String(s._id),
+            tableId: s.tableId,
+            zoneId: s.zoneId,
+          }));
 
     if (!tickets.length) {
       return res.status(400).json({ message: "No hay tickets/asientos vendidos para esta orden" });
     }
 
-    // Genera/asegura PDFs
-    for (const t of tickets) {
-      const seat = seats.find((s: any) => String(s._id) === String(t.seatId)) || null;
-      await ensureTicketPdf({ ticketId: t.ticketId, order, seat });
+    // 4) Mapa seatId -> item para extraer zona y precio
+    const itemBySeat = new Map<string, any>();
+    for (const it of order.items || []) {
+      for (const sid of it.seatIds || []) {
+        itemBySeat.set(String(sid), it);
+      }
     }
 
-    // URLs públicas
+    // 5) Enriquecer y generar PDFs
+    for (const t of tickets) {
+      const s =
+        seats.find((x: any) => String(x._id) === String(t.seatId)) || ({} as any);
+      const it =
+        itemBySeat.get(String(s.seatId)) ||
+        itemBySeat.get(String(s._id)) ||
+        itemBySeat.get(String(t.seatId)) ||
+        null;
+
+      // zona
+      const zoneId = t.zoneId ?? it?.zoneId ?? s.zoneId ?? s.zone ?? undefined;
+
+      // precio (centavos -> pesos) usando el helper
+      let pricePesos: number | undefined = undefined;
+      if (event && it) {
+        const cents = priceCentsForItem(event, it);
+        if (Number.isFinite(cents)) pricePesos = Math.round(cents) / 100;
+      } else if (typeof it?.unitPrice === "number") {
+        pricePesos = it.unitPrice;
+      }
+
+      const seatForPdf = {
+        zoneId,
+        tableId: t.tableId ?? s.tableId ?? s.table ?? undefined,
+        seatId: s.seatId ?? t.seatId ?? s.seat ?? undefined,
+        price: pricePesos,
+      };
+
+      // Datos del evento listos para el PDF
+      const eventName = event?.title ?? "Evento";
+      const eventDate = order.sessionDate ?? event?.sessions?.[0]?.date ?? undefined;
+      const eventPlace = [event?.venue, event?.city].filter(Boolean).join(", ");
+
+      const orderForPdf = {
+        ...order,
+        eventName,
+        eventDate,
+        eventPlace,
+      };
+
+      await ensureTicketPdf({
+        ticketId: t.ticketId,
+        order: orderForPdf,
+        seat: seatForPdf,
+      });
+    }
+
+    // 6) Responder con URLs públicas de los PDFs en /files/tickets
     const base = `${req.protocol}://${req.get("host")}/files/tickets`;
     const files = tickets.map((t: any) => ({
       ticketId: t.ticketId,

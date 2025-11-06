@@ -12,6 +12,8 @@ import CartPage from "./pages/Cart";
 import CheckoutSuccess from "./pages/CheckoutSuccess";
 import CheckoutCancel from "./pages/CheckoutCancel";
 import { useAuth } from "./auth/AuthProviders"; // ⬅️ importa el hook
+import AccountPage from "./pages/AccountPage";
+
 
 function RequireAuth({ children }: { children: JSX.Element }) {
   const { user, ready } = useAuth();              // ⬅️ usa el estado del provider
@@ -54,6 +56,17 @@ export default function App() {
             </RequireAuth>
           }
         />
+
+        {/* Configuración de cuenta (protegida) */}
+        <Route
+          path="/account"
+          element={
+            <RequireAuth>
+              <AccountPage />
+            </RequireAuth>
+          }
+        />
+
 
         {/* Admin protegido (si AdminRoute usa token/localStorage, actualízalo a useAuth también) */}
         <Route

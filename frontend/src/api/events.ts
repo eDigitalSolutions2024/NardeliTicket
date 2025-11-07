@@ -1,50 +1,48 @@
-import axios from "axios";
+// src/api/events.ts
 import type { EventItem } from "../types/Event";
-
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:4000",
-  timeout: 8000,
-});
-
-// Adjunta el token en TODAS las requests si existe
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers = config.headers ?? {};
-    (config.headers as any).Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
-
-export { api }; // por si lo reutilizas
+import { api } from "./client";
 
 // -------- READ --------
 export async function fetchEvents(): Promise<EventItem[]> {
-  const { data } = await api.get("/api/events");
+  const { data } = await api.get("/events");
   return (data as any[]).map(mapToEventItem);
 }
 
 // -------- CREATE --------
 export async function createEvent(payload: Partial<EventItem>): Promise<EventItem> {
   const body = toCreateBody(payload);
-  const { data } = await api.post("/api/events", body);
+  const { data } = await api.post("/events", body);
   return mapToEventItem(data);
 }
 
 // -------- UPDATE (parcial, sin tocar sesiones si no vienen) --------
 export async function updateEvent(id: string, payload: Partial<EventItem>): Promise<EventItem> {
   const body = toUpdateBody(payload);
-  const { data } = await api.put(`/api/events/${id}`, body);
+  const { data } = await api.put(`/events/${id}`, body);
   return mapToEventItem(data);
 }
 
 // -------- DELETE --------
 export async function deleteEvent(id: string): Promise<void> {
-  await api.delete(`/api/events/${id}`);
+  await api.delete(`/events/${id}`);
 }
 
-/* helpers */
-/* helpers */
+// -------- READ ONE --------
+export async function getEvent(id: string): Promise<EventItem> {
+  const { data } = await api.get(`/events/${id}`);
+  return mapToEventItem(data);
+}
+
+// -------- BLOCKED SEATS (sold/active) --------
+export async function fetchBlockedSeats(eventId: string): Promise<string[]> {
+  const { data } = await api.get(`/events/${eventId}/blocked`);
+  return Array.isArray(data?.blocked) ? (data.blocked as string[]) : [];
+}
+
+/* ========================
+          helpers
+   ======================== */
+
 const mapToEventItem = (d: any): EventItem => ({
   id: d._id?.toString?.() ?? d.id,
   title: d.title,
@@ -55,8 +53,6 @@ const mapToEventItem = (d: any): EventItem => ({
   sessions: (d.sessions ?? []).map((s: any) => ({ id: s._id?.toString?.(), date: s.date })),
   status: d.status ?? "draft",
   featured: Boolean(d.featured),
-
-  // ⬇️ NUEVO
   pricing: {
     vip: d.pricing?.vip ?? 0,
     oro: d.pricing?.oro ?? 0,
@@ -83,7 +79,7 @@ function toCreateBody(p: Partial<EventItem>) {
     };
   }
   return body;
-};
+}
 
 // Para actualizar: SOLO enviamos los campos presentes.
 // ⚠️ Si NO pasas sessions, NO se mandan y NO se borran en DB.
@@ -110,18 +106,4 @@ function toUpdateBody(p: Partial<EventItem>) {
   }
 
   return body;
-}
-
-
-
-// ...
-export async function getEvent(id: string): Promise<EventItem> {
-  const { data } = await api.get(`/api/events/${id}`);
-  return mapToEventItem(data);
-}
-
-// -------- BLOCKED SEATS (sold/active) --------
-export async function fetchBlockedSeats(eventId: string): Promise<string[]> {
-  const { data } = await api.get(`/api/events/${eventId}/blocked`);
-  return Array.isArray(data?.blocked) ? (data.blocked as string[]) : [];
 }

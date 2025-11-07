@@ -43,8 +43,10 @@ export default function Register({ onSuccess }: Props) {
         <label>
           Contraseña
           <input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} required />
+          <br></br>
         </label>
-        <button type="submit" disabled={loading}>
+        
+        <button type="submit" disabled={loading} className="btn btn-primary btn-block" >
           {loading ? "Creando..." : "Crear cuenta"}
         </button>
       </form>

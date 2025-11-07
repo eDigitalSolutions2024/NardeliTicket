@@ -2,5 +2,5 @@
 .auth__card { width: 100%; max-width: 460px; background: #fff; border-radius: 14px; box-shadow: 0 10px 30px rgba(2,8,23,.08); padding: 16px; max-height:600px; }
 .auth__tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f1f5f9; padding: 6px; border-radius: 10px; margin-bottom: 16px; }
 .auth__tab { height: 40px; border: 0; border-radius: 8px; background: transparent; font-weight: 700; cursor: pointer; }
-.auth__tab.is-active { background: #0a5cff; color: #fff; }
+.auth__tab.is-active { background: #7777778f; color: #fff; }
 .auth__panel { padding-top: 0px; margin-top: -80px;}

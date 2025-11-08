@@ -1,5 +1,5 @@
 // src/pages/Home.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import  { useEffect, useMemo, useState } from "react";
 import SimpleCarousel, { type Slide } from "../components/SimpleCarousel";
 import type { EventItem } from "../types/Event";
 import EventCard from "../components/EventCard";

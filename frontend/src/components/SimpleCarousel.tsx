@@ -25,7 +25,7 @@ export default function SimpleCarousel({
   const timer = useRef<number | null>(null);
   const paused = useRef(false);
 
-  const go = (n: number) => setIdx((p) => (n + slides.length) % slides.length);
+  const go = (n: number) => setIdx((_p) => (n + slides.length) % slides.length);
   const next = () => go(idx + 1);
   const prev = () => go(idx - 1);
 

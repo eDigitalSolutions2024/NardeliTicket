@@ -1,5 +1,5 @@
 // src/pages/Events.tsx
-import React, { useEffect, useMemo, useState } from "react";
+import  { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { fetchEvents } from "../api/events";
 import type { EventItem } from "../types/Event";
@@ -69,7 +69,7 @@ export default function EventsPage() {
       if (!map.has(cat)) map.set(cat, []);
       map.get(cat)!.push(ev);
     }
-    for (const [cat, list] of map.entries()) {
+    for (const [, list] of map.entries()) {
       list.sort((a, b) => {
         const an = getNextDate(a) ?? Number.MAX_SAFE_INTEGER;
         const bn = getNextDate(b) ?? Number.MAX_SAFE_INTEGER;

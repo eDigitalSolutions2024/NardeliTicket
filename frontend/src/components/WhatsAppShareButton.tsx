@@ -1,4 +1,4 @@
-import React from "react";
+
 import { openWhatsAppShare } from "../utils/whatsapp";
 
 type Props = {

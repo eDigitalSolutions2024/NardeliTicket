@@ -8,7 +8,8 @@
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
     "@types/pdfkit": "^0.17.3",
-    "@types/react": "^19.2.2",
-    "@types/react-dom": "^19.2.2"
+    "@types/react": "^18.3.26",
+    "@types/react-dom": "^18.3.7",
+    "typescript": "^5.9.3"
   }
 }

@@ -18,7 +18,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
   // ✅ estado de sesión desde el AuthProvider
-  const { user, ready, logout } = useAuth();
+  const { user, logout } = useAuth();
   const [openUserMenu, setOpenUserMenu] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 

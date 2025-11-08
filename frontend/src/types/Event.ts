@@ -17,4 +17,5 @@ export interface EventItem {
   status?: EventStatus;
   featured?: boolean;
   pricing?: TicketPricing;
+  createdAt?: string;
 }

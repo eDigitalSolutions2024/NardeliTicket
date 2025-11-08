@@ -1,6 +1,6 @@
 // src/api/client.ts
 import axios, { AxiosError } from "axios";
-
+import type { AxiosRequestHeaders } from "axios";
 /**
  * API_ORIGIN: ej. http://localhost:4000
  * API_BASE:   ej. http://localhost:4000/api
@@ -36,7 +36,7 @@ export function getAccessToken(): string | null {
    Request Interceptor: Adjunta Authorization si hay token
    ============================================================ */
 api.interceptors.request.use((config) => {
-  if (!config.headers) config.headers = {};
+  if (!config.headers) config.headers = {} as AxiosRequestHeaders;
   if (accessToken) {
     (config.headers as any).Authorization = `Bearer ${accessToken}`;
   }

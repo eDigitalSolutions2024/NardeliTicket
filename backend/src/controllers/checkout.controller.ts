@@ -2,6 +2,7 @@
 import { Request, Response } from "express";
 import PDFDocument from "pdfkit";
 import QRCode from "qrcode";
+import { Types } from "mongoose";
 import Order from "../models/Order";
 import SeatHold from "../models/SeatHold";
 import { stripe } from "../utils/stripe";
@@ -128,6 +129,9 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
       statusTimeline: [{ status: "pending_payment", at: new Date() }],
     });
 
+    // ⚙️ Id seguro como string para evitar TS "unknown" con Mongoose
+    const orderId: string = String(order._id as unknown as Types.ObjectId);
+
     // Agrupar por zona para líneas de "entradas"
     const zoneAgg = new Map<string, { qty: number; unit_amount: number; tableNames: Set<string> }>();
     for (const it of items) {
@@ -180,9 +184,9 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items,
-      metadata: { orderId: order._id.toString(), eventId },
-      success_url: `${process.env.PUBLIC_URL}/checkout/success?orderId=${order._id}`,
-      cancel_url: `${process.env.PUBLIC_URL}/checkout/cancel?order=${order._id}`,
+      metadata: { orderId, eventId },
+      success_url: `${process.env.PUBLIC_URL}/checkout/success?orderId=${orderId}`,
+      cancel_url: `${process.env.PUBLIC_URL}/checkout/cancel?order=${orderId}`,
       // customer_email: req.user?.email,
     });
 
@@ -196,7 +200,7 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
         tableId: it.tableId,
         seatId: s,
         userId,
-        orderId: order._id.toString(),
+        orderId,
         status: "active",
         expiresAt: new Date(Date.now() + 15 * 60 * 1000),
       }))
@@ -205,7 +209,7 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
       await SeatHold.insertMany(holdDocs, { ordered: false });
     }
 
-    return res.json({ checkoutUrl: session.url, orderId: order._id });
+    return res.json({ checkoutUrl: session.url, orderId });
   } catch (err: any) {
     console.error(err);
     return res.status(500).json({ error: "checkout_failed", message: err.message });
@@ -224,7 +228,7 @@ export async function streamSingleTicketPdf(req: Request, res: Response) {
     const order = await Order.findOne({ "tickets.ticketId": ticketId }).lean();
     if (!order) return res.status(404).json({ message: "Boleto no encontrado" });
 
-    const ticket = (order.tickets || []).find((t) => String(t.ticketId) === String(ticketId));
+    const ticket = (order.tickets || []).find((t: any) => String(t.ticketId) === String(ticketId));
     if (!ticket) return res.status(404).json({ message: "Boleto no encontrado" });
 
     // 2) Carga (opcional) del evento para encabezado
@@ -261,8 +265,7 @@ export async function streamSingleTicketPdf(req: Request, res: Response) {
     // ------- Render del boleto -------
     // Encabezado
     const eventTitle = event?.title || "Evento";
-    const eventDate =
-      order.sessionDate || event?.sessions?.[0]?.date || null;
+    const eventDate = order.sessionDate || event?.sessions?.[0]?.date || null;
     const eventLoc = [event?.venue, event?.city].filter(Boolean).join(", ");
 
     doc.fontSize(22).fillColor("#111").text("NardeliTicket");
@@ -354,7 +357,7 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
 
     // 4) Mapa seatId -> item para extraer zona y precio
     const itemBySeat = new Map<string, any>();
-    for (const it of order.items || []) {
+    for (const it of (order as any).items || []) {
       for (const sid of it.seatIds || []) {
         itemBySeat.set(String(sid), it);
       }
@@ -391,7 +394,7 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
 
       // Datos del evento listos para el PDF
       const eventName = event?.title ?? "Evento";
-      const eventDate = order.sessionDate ?? event?.sessions?.[0]?.date ?? undefined;
+      const eventDate = (order as any).sessionDate ?? event?.sessions?.[0]?.date ?? undefined;
       const eventPlace = [event?.venue, event?.city].filter(Boolean).join(", ");
 
       const orderForPdf = {

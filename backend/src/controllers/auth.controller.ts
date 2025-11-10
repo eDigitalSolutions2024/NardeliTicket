@@ -49,9 +49,9 @@ export async function register(req: Request, res: Response) {
     role: role === "admin" ? "admin" : "user",
   });
 
-  const accessToken = signAccessToken({ sub: user._id, role: user.role });
+  const accessToken = signAccessToken({ sub: user._id.toString(), role: user.role });
   const { token: refreshToken, jti, expiresAt } = signRefreshToken({
-    sub: user._id,
+    sub: user._id.toString(),
     role: user.role,
   });
   await RefreshToken.create({ userId: user._id, jti, expiresAt, revoked: false });
@@ -75,9 +75,9 @@ export async function login(req: Request, res: Response) {
   const ok = await comparePassword(password, user.passwordHash);
   if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
-  const accessToken = signAccessToken({ sub: user._id, role: user.role });
+  const accessToken = signAccessToken({ sub: user._id.toString(), role: user.role });
   const { token: refreshToken, jti, expiresAt } = signRefreshToken({
-    sub: user._id,
+    sub: user._id.toString(),
     role: user.role,
   });
 

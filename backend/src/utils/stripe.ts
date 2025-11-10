@@ -7,5 +7,5 @@ if (!key) {
 }
 
 export const stripe = new Stripe(key, {
-  apiVersion: "2024-06-20",           // <- Literal string soportado por el SDK moderno
+  //apiVersion: "2024-06-20",           // <- Literal string soportado por el SDK moderno
 });

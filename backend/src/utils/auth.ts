@@ -1,16 +1,9 @@
+// src/utils/auth.ts
 import bcrypt from "bcryptjs";
-import { sign, verify } from "jsonwebtoken";
-import type { JwtPayload, SignOptions, Secret } from "jsonwebtoken";
+import { sign, verify, JwtPayload, type SignOptions, type Secret } from "jsonwebtoken";
 import { randomUUID } from "crypto";
 
-/** Payload estándar que usaremos en tus controladores */
-export type TokenPayload = {
-  sub: string;                 // subject (id de usuario)
-  jti?: string;                // id del token (para refresh)
-  [k: string]: unknown;        // campos extra permitidos
-};
-
-/* ------------------ Password helpers ------------------ */
+/* ======================= Password ======================= */
 export async function hashPassword(plain: string) {
   const salt = await bcrypt.genSalt(10);
   return bcrypt.hash(plain, salt);
@@ -19,65 +12,50 @@ export async function comparePassword(plain: string, hash: string) {
   return bcrypt.compare(plain, hash);
 }
 
-/* ------------------ JWT base helpers ------------------ */
-/**
- * Firma un JWT con expiración y opciones extra.
- * Forzamos `secret` a `Secret` y validamos que no esté vacío
- * para que TypeScript seleccione la sobrecarga correcta.
- */
+/* ================== Helpers base JWT ==================== */
+/** Firma un token tipado sin chocar con las sobrecargas de jsonwebtoken v9. */
 export function signToken(
   payload: Record<string, unknown>,
   secret: Secret,
-  expiresIn: string | number = "1d",
-  options: Omit<SignOptions, "expiresIn"> = {}
-): string {
-  // Validación para evitar que TS piense que secret es null/undefined
-  if (
-    secret == null ||
-    (typeof secret === "string" && secret.trim().length === 0)
-  ) {
-    throw new Error("Missing JWT secret");
-  }
-
-  return sign(payload, secret, { ...options, expiresIn });
+  options: SignOptions = { expiresIn: "1d" as const } // 👈 literal const
+) {
+  if (!secret) throw new Error("Missing JWT secret");
+  return sign(payload, secret, options);
 }
 
-/** Verifica un JWT y devuelve su payload tipado */
-export function verifyToken<T = JwtPayload>(token: string, secret: Secret): T {
-  if (
-    secret == null ||
-    (typeof secret === "string" && secret.trim().length === 0)
-  ) {
-    throw new Error("Missing JWT secret");
-  }
+export function verifyToken<T = JwtPayload>(token: string, secret: Secret) {
   return verify(token, secret) as T;
 }
 
-/* ------------------ Access / Refresh helpers ------------------ */
-const ACCESS_TTL = process.env.JWT_EXPIRES ?? "15m";
-const REFRESH_TTL_DAYS = Number(process.env.REFRESH_TTL_DAYS ?? 30);
+/* ========== Access / Refresh con validaciones =========== */
+export type TokenPayload = {
+  sub: string; // id de usuario como string
+  [k: string]: unknown;
+};
 
-const ACCESS_SECRET = process.env.JWT_SECRET as string | undefined;
-const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET as string | undefined;
+// Asegura tipos compatibles con jsonwebtoken v9
+const ACCESS_TTL = (process.env.JWT_EXPIRES ?? "15m") as SignOptions["expiresIn"];
+const REFRESH_TTL_DAYS = Number(process.env.REFRESH_TTL_DAYS || 30);
 
-// 🔒 Validación temprana (falla al arrancar si faltan)
-if (!ACCESS_SECRET) throw new Error("❌ Missing env JWT_SECRET");
-if (!REFRESH_SECRET) throw new Error("❌ Missing env JWT_REFRESH_SECRET");
+const ACCESS_SECRET = process.env.JWT_SECRET as Secret | undefined;
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET as Secret | undefined;
 
-/** Access token corto (~15m) */
+if (!ACCESS_SECRET) throw new Error("Missing env JWT_SECRET");
+if (!REFRESH_SECRET) throw new Error("Missing env JWT_REFRESH_SECRET");
+
+/** Access token (~15m) */
 export function signAccessToken(payload: TokenPayload) {
-  return signToken(payload, ACCESS_SECRET!, ACCESS_TTL);
+  return sign(payload, ACCESS_SECRET!, { expiresIn: ACCESS_TTL });
 }
 
-/** Refresh token largo (~30d) – genera jti si no existe */
-export function signRefreshToken(payload: TokenPayload) {
+/** Refresh token (~30d) con jti */
+export function signRefreshToken(payload: Partial<TokenPayload> & { jti?: string }) {
   const jti = payload.jti ?? randomUUID();
+  const refreshExpiresIn = `${REFRESH_TTL_DAYS}d` as const; // 👈 literal const
 
-  const token = signToken(
-    { ...payload, jti },
-    REFRESH_SECRET!,
-    `${REFRESH_TTL_DAYS}d`
-  );
+  const token = sign({ ...payload, jti }, REFRESH_SECRET!, {
+    expiresIn: refreshExpiresIn,
+  });
 
   return {
     token,

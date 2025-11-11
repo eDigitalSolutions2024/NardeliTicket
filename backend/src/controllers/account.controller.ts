@@ -1,22 +1,21 @@
 // src/controllers/account.controller.ts
-import { Request, Response } from "express";
+import { RequestHandler } from "express";
 import { User } from "../models/User";
 import bcrypt from "bcryptjs";
 
-type ReqWithUser = Request & { user?: { id: string } };
-
-export async function getAccount(req: ReqWithUser, res: Response) {
-  const uid = req.user?.id;                   // ✅ leer de req.user.id (tu middleware)
+export const getAccount: RequestHandler = async (req, res) => {
+  const uid = req.user?.id;
   if (!uid) return res.status(401).json({ message: "No autorizado" });
 
   const user = await User.findById(uid).lean();
   if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
-  const { passwordHash, ...safe } = user as any;
-  res.json(safe);
-}
 
-export async function updateProfile(req: ReqWithUser, res: Response) {
-  const uid = req.user?.id;                   // ✅
+  const { passwordHash, ...safe } = user as any;
+  return res.json(safe);
+};
+
+export const updateProfile: RequestHandler = async (req, res) => {
+  const uid = req.user?.id;
   if (!uid) return res.status(401).json({ message: "No autorizado" });
 
   const { name, phone } = req.body || {};
@@ -31,12 +30,13 @@ export async function updateProfile(req: ReqWithUser, res: Response) {
   ).lean();
 
   if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
-  const { passwordHash, ...safe } = user as any;
-  res.json(safe);
-}
 
-export async function changePassword(req: ReqWithUser, res: Response) {
-  const uid = req.user?.id;                   // ✅
+  const { passwordHash, ...safe } = user as any;
+  return res.json(safe);
+};
+
+export const changePassword: RequestHandler = async (req, res) => {
+  const uid = req.user?.id;
   if (!uid) return res.status(401).json({ message: "No autorizado" });
 
   const { currentPassword, newPassword } = req.body || {};
@@ -56,5 +56,5 @@ export async function changePassword(req: ReqWithUser, res: Response) {
   user.passwordHash = await bcrypt.hash(String(newPassword), 10);
   await user.save();
 
-  res.json({ ok: true });
-}
+  return res.json({ ok: true });
+};

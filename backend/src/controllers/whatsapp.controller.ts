@@ -62,9 +62,9 @@ async function resolveOrderAndSeatForTicket(ticketId: string) {
     const sh = await SeatHold.findById(ticketId).lean();
     if (sh) {
       seat = {
-        zoneId: sh.zoneId ?? sh.zone,
-        tableId: sh.tableId ?? sh.table,
-        seatId: sh.seatId ?? sh.seat,
+        zoneId: sh.zoneId,      // puede venir undefined y está bien si no usas zonas
+        tableId: sh.tableId,    // ✅ existe en tu modelo
+        seatId: sh.seatId,
       };
     }
   }

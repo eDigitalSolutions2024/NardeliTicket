@@ -1,30 +1,40 @@
 // src/routes/cart.routes.ts
-import { Router } from "express";
+import { Router, Request, Response } from "express";
 import Cart from "../models/Cart";
-import { authOptional } from "../middlewares/authOptional"; // 👈 nuevo
+import { authOptional } from "../middlewares/authOptional";
 
 const r = Router();
 
-/** Obtener carrito */
-r.get("/", authOptional, async (req: any, res) => {
+type ReqWithOptUser = Request & { user?: any };
+
+// --- GET /api/cart  -> obtener carrito ---
+r.get("/", authOptional, async (req: ReqWithOptUser, res: Response) => {
   const sessionid = String((req.headers as any).sessionid || "");
   const filter = req.user ? { userId: req.user._id } : { sessionId: sessionid };
+
   const cart = await Cart.findOne(filter).lean();
   res.json(cart ?? { items: [] });
 });
 
-/** Agregar/actualizar item(s) del evento actual */
-r.post("/items", authOptional, async (req: any, res) => {
-  const { eventId, items } = req.body || {};
+// --- POST /api/cart/items  -> agregar/actualizar items del evento actual ---
+r.post("/items", authOptional, async (req: ReqWithOptUser, res: Response) => {
+  const { eventId, items } = (req.body ?? {}) as { eventId?: string; items?: any[] };
   const sessionid = String((req.headers as any).sessionid || "");
-  if (!eventId || !Array.isArray(items)) return res.status(400).json({ error: "Bad payload" });
+  if (!eventId || !Array.isArray(items)) {
+    return res.status(400).json({ error: "Bad payload" });
+  }
 
   const filter = req.user ? { userId: req.user._id } : { sessionId: sessionid };
-  let cart = await Cart.findOne(filter);
-  if (!cart) cart = new (Cart as any)(filter);
 
-  const keepOthers = (cart.items || []).filter((i: any) => String(i.eventId) !== String(eventId));
-  cart.items = [
+  // Lee el carrito en lean() para evitar DocumentArray typings
+  const existing = await Cart.findOne(filter).lean();
+
+  // Mantén otros eventos y mezcla con los nuevos
+  const keepOthers = (existing?.items ?? []).filter(
+    (i: any) => String(i.eventId) !== String(eventId)
+  );
+
+  const merged = [
     ...keepOthers,
     ...items.map((it: any) => ({
       eventId,
@@ -34,19 +44,36 @@ r.post("/items", authOptional, async (req: any, res) => {
       price: it.unitPrice,
     })),
   ];
-  cart.updatedAt = new Date();
-  await cart.save();
 
-  const eventsCount = new Set(cart.items.map((i: any) => String(i.eventId))).size;
-  res.json({ ok: true, eventsCount, cartId: cart._id });
+  // Persiste con upsert para evitar “possibly null” y choques de tipos
+  const updated = await Cart.findOneAndUpdate(
+    filter,
+    {
+      $set: {
+        items: merged,
+        updatedAt: new Date(),
+      },
+    },
+    {
+      new: true,
+      upsert: true,
+      // si tu esquema tiene validaciones estrictas que chocan, puedes habilitar:
+      // runValidators: false,
+    }
+  ).lean();
+
+  const eventsCount = new Set((updated?.items ?? []).map((i: any) => String(i.eventId))).size;
+  return res.json({ ok: true, eventsCount, cartId: updated?._id });
 });
 
-/** Resumen para el badge del navbar */
-r.get("/summary", authOptional, async (req: any, res) => {
+// --- GET /api/cart/summary  -> contador para el badge del navbar ---
+r.get("/summary", authOptional, async (req: ReqWithOptUser, res: Response) => {
   const sessionid = String((req.headers as any).sessionid || "");
   const filter = req.user ? { userId: req.user._id } : { sessionId: sessionid };
+
   const cart = await Cart.findOne(filter).lean();
-  const count = cart ? new Set(cart.items.map((i: any) => String(i.eventId))).size : 0;
+  const count = cart ? new Set((cart.items ?? []).map((i: any) => String(i.eventId))).size : 0;
+
   res.json({ eventsCount: count });
 });
 

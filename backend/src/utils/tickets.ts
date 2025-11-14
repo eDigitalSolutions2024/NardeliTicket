@@ -78,7 +78,7 @@ export async function ensureTicketPdf({
     : null;
 
   // 👇 Preparamos un texto/URL “dummy” para el QR (luego lo cambiamos)
-  const base = process.env.PUBLIC_BASE_URL ?? "http://localhost:5173";
+  const base = process.env.PUBLIC_URL ?? "http://localhost:5173";
   const qrText = `${base}/tickets/verify?tid=${ticketId}&oid=${order?._id ?? ""}`;
   const qrBuf = await QRCode.toBuffer(qrText, {
     errorCorrectionLevel: "M",

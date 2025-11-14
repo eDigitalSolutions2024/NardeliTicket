@@ -412,12 +412,17 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
     }
 
     // 6) Responder con URLs públicas de los PDFs en /files/tickets
-    const base = `${req.protocol}://${req.get("host")}/files/tickets`;
-    const files = tickets.map((t: any) => ({
-      ticketId: t.ticketId,
-      fileName: ticketFileName(t.ticketId),
-      url: `${base}/${ticketFileName(t.ticketId)}`,
-    }));
+      const origin =
+        process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`;
+
+      const base = `${origin}/files/tickets`;
+
+      const files = tickets.map((t: any) => ({
+        ticketId: t.ticketId,
+        fileName: ticketFileName(t.ticketId),
+        url: `${base}/${ticketFileName(t.ticketId)}`,
+      }));
+
 
     return res.json({ orderId, count: files.length, files });
   } catch (e: any) {

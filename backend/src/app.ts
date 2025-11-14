@@ -14,6 +14,9 @@ import adminSalesRoutes from "./routes/admin.sales.routes";
 import accountRoutes from "./routes/account.routes";
 const app = express();
 
+// 👇 añade esta línea
+app.set("trust proxy", 1);
+
 /** 1) CORS con credenciales y origin explícito (usa FRONTEND_URL si la tienes) */
 const FRONT = process.env.FRONTEND_URL || process.env.PUBLIC_URL || "http://localhost:5173";
 app.use(

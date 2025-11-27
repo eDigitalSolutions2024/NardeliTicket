@@ -165,13 +165,15 @@ function SeatDot({
 }
 
 /* -------------------------- Embedded SVG Map -------------------------- */
-const TABLE_W = 170;
-const TABLE_H = 86;
-const TABLE_R = 16;
-const STEP_X = 260;
-const STEP_Y = 190;
-const VIP_OFFSETS = { topY: -70, bottomY: 70, leftX: -105, rightX: 110 };
-const ORO_OFFSETS = { topY: -70, bottomY: 70, leftX: -105, rightX: 110 };
+const TABLE_W = 190;
+const TABLE_H = 120;
+const TABLE_R = 18;
+
+const STEP_X = 340;
+const STEP_Y = 250;
+
+const VIP_OFFSETS = { topY: -90, bottomY: 90, leftX: -120, rightX: 120 };
+const ORO_OFFSETS = { topY: -90, bottomY: 90, leftX: -120, rightX: 120 };
 
 const makePattern = ({
   topY,
@@ -184,20 +186,30 @@ const makePattern = ({
   leftX: number;
   rightX: number;
 }): [number, number][] => [
-  [-52, topY],
-  [-26, topY],
-  [0, topY],
-  [26, topY],
-  [-52, bottomY],
-  [-26, bottomY],
-  [0, bottomY],
-  [26, bottomY],
+  // fila superior: 5 asientos
+  [-72, topY],
+  [-36, topY],
+  [0,   topY],
+  [36,  topY],
+  [72,  topY],
+
+  // fila inferior: 5 asientos
+  [-72, bottomY],
+  [-36, bottomY],
+  [0,   bottomY],
+  [36,  bottomY],
+  [72,  bottomY],
+
   [leftX, 0],
   [rightX, 0],
 ];
 
 const SEAT_PATTERN_VIP = makePattern(VIP_OFFSETS);
 const SEAT_PATTERN_ORO = makePattern(ORO_OFFSETS);
+
+
+const numToLetter = (n: number) =>
+  String.fromCharCode("A".charCodeAt(0) + (n - 1));
 
 type SeatNode = {
   id: string;
@@ -245,13 +257,15 @@ function SeatMapSVG({
       for (let c = 0; c < 3; c++) {
         tVip++;
         const id = `VIP-${String(tVip).padStart(2, "0")}`;
+        const tableLetter = numToLetter(tVip);
+
         const cx = vipOrigin.x + c * STEP_X;
         const cy = vipOrigin.y + r * STEP_Y;
         const seats: SeatNode[] = SEAT_PATTERN_VIP.map(([dx, dy], i) => {
           seatGlobal++;
           return {
             id: `S${seatGlobal}`,
-            label: String(i + 1),
+            label: `${tableLetter}${i + 1}`,
             x: cx + dx,
             y: cy + dy,
             status: "available",
@@ -264,19 +278,21 @@ function SeatMapSVG({
     }
 
     // ZONA ORO (derecha) 5 x 5
-    const oroOrigin = { x: 1160, y: 300 };
+    const oroOrigin = { x: 1350, y: 300 };
     let tOro = 0;
     for (let r = 0; r < 5; r++) {
       for (let c = 0; c < 5; c++) {
         tOro++;
         const id = `ORO-${String(tOro).padStart(2, "0")}`;
+        const tableLetter = numToLetter(tOro);
+
         const cx = oroOrigin.x + c * STEP_X;
         const cy = oroOrigin.y + r * STEP_Y;
         const seats: SeatNode[] = SEAT_PATTERN_ORO.map(([dx, dy], i) => {
           seatGlobal++;
           return {
             id: `S${seatGlobal}`,
-            label: String(i + 1),
+            label: `${tableLetter}${i + 1}`,
             x: cx + dx,
             y: cy + dy,
             status: "available",
@@ -314,31 +330,49 @@ function SeatMapSVG({
   const colorBy = (state: SeatStatus | "selected") =>
     state === "selected" ? "#22c55e" : state === "available" ? "#9ca3af" : state === "held" ? "#f59e0b" : "#ef4444";
 
-  const renderTableRect = (t: TableGeom) => (
-    <g key={`${t.id}-rect`}>
-      <rect
-        x={t.cx - TABLE_W / 2}
-        y={t.cy - TABLE_H / 2}
-        width={TABLE_W}
-        height={TABLE_H}
-        rx={TABLE_R}
-        ry={TABLE_R}
-        fill="#e9eef7"
-        stroke="#8aa0c7"
-        strokeWidth={2}
-      />
-      <text
-        x={t.cx}
-        y={t.cy + 7}
-        fontSize={16}
-        textAnchor="middle"
-        fill="#334155"
-        style={{ pointerEvents: "none", fontWeight: 800, letterSpacing: 0.3 }}
-      >
-        {t.id}
-      </text>
-    </g>
-  );
+  /*const numToLetter = (n: number) =>
+    String.fromCharCode("A".charCodeAt(0) + (n - 1));*/
+
+  const renderTableRect = (t: TableGeom) => {
+    // t.id viene como "VIP-01", "ORO-15", etc.
+    const [zone, numStr] = t.id.split("-");
+    const num = parseInt(numStr, 10);
+    const label =
+      !isNaN(num) && num >= 1
+        ? `${zone}-${numToLetter(num)}`
+        : t.id; // fallback por si algo raro
+
+    return (
+      <g key={`${t.id}-rect`}>
+        <rect
+          x={t.cx - TABLE_W / 2}
+          y={t.cy - TABLE_H / 2}
+          width={TABLE_W}
+          height={TABLE_H}
+          rx={TABLE_R}
+          ry={TABLE_R}
+          fill="#e9eef7"
+          stroke="#8aa0c7"
+          strokeWidth={2}
+        />
+        <text
+          x={t.cx}
+          y={t.cy + 8}
+          fontSize={30}                   // 👈 más grande
+          textAnchor="middle"
+          fill="#334155"
+          style={{
+            pointerEvents: "none",
+            fontWeight: 900,             // 👈 más pesado
+            letterSpacing: 0.6,
+          }}
+        >
+          {label}                         {/* VIP-A, ORO-C, etc */}
+        </text>
+      </g>
+    );
+  };
+
 
   return (
     <div style={{ background: "#0b1220", borderRadius: 12, overflow: "hidden" }}>
@@ -361,22 +395,22 @@ function SeatMapSVG({
 
           {/* Marcos de zona */}
           {/* VIP */}
-          <rect x="110" y="120" width="820" height="1200" fill="none" stroke="#1e62ff" strokeWidth={14} rx={20} />
+          <rect x="100" y="120" width="1025" height="1400" fill="none" stroke="#1e62ff" strokeWidth={14} rx={20} />
           <g transform="translate(140, 205)">
-            <text x="16" y="-105" fill="#e5e7eb" fontSize={34} fontWeight={900}>
-              ZONA VIP — 15 mesas × 10 asientos
+            <text x="200" y="-105" fill="#e5e7eb" fontSize={34} fontWeight={900}>
+              ZONA VIP — 15 mesas × 12 asientos
             </text>
           </g>
 
           {/* ORO */}
-          <rect x="990" y="120" width="1440" height="1200" fill="none" stroke="#d4af37" strokeWidth={14} rx={20} />
-          <g transform="translate(1320, 205)">
-            <text x="16" y="-105" fill="#e5e7eb" fontSize={34} fontWeight={900}>
-              ZONA ORO — 25 mesas × 10 asientos
+          <rect x="1150" y="120" width="1800" height="1400" fill="none" stroke="#d4af37" strokeWidth={14} rx={20} />
+          <g transform="translate(1420, 205)">
+            <text x="400" y="-105" fill="#e5e7eb" fontSize={34} fontWeight={900}>
+              ZONA ORO — 25 mesas × 12 asientos
             </text>
           </g>
 {/* Botón lateral PREVIEW – versión grande */}
-<g transform="translate(2475, 320)" role="button" tabIndex={0}
+<g transform="translate(2860, 320)" role="button" tabIndex={0}
    onClick={onPreview}
    onKeyDown={(e: any) => (e.key === "Enter" || e.key === " ") && onPreview()}
    style={{ cursor: "pointer" }}>
@@ -387,19 +421,19 @@ function SeatMapSVG({
   </filter>
 
   {/* Cuerpo del botón */}
-  <rect x="0" y="-130" width="70" height="260" rx="18"
+  <rect x="50" y="-130" width="70" height="260" rx="18"
         fill="#111" stroke="#fbbf24" strokeWidth={4}
         filter="url(#btnGlowBig)" />
 
   {/* Ícono cámara */}
-  <g transform="translate(35, -85)">
+  <g transform="translate(85, -85)">
     <rect x="-13" y="-10" width="26" height="20" rx="4" fill="#e5e7eb" />
     <circle cx="0" cy="0" r="5" fill="#111827" />
     <rect x="10" y="-8" width="8" height="6" rx="2" fill="#e5e7eb" />
   </g>
 
   {/* Texto vertical más grande */}
-  <text x="35" y="20" fill="#e5e7eb"
+  <text x="35" y="75" fill="#e5e7eb"
         fontSize="18" fontWeight="900"
         textAnchor="middle"
         transform="rotate(-90 35,20)"
@@ -408,13 +442,13 @@ function SeatMapSVG({
   </text>
 
   {/* Ping animado más notorio */}
-  <circle cx="35" cy="115" r="8" fill="#fbbf24" opacity="0.9">
+  <circle cx="80" cy="115" r="8" fill="#fbbf24" opacity="0.9">
     <animate attributeName="r" values="8;18;8" dur="1.6s" repeatCount="indefinite" />
     <animate attributeName="opacity" values="0.9;0.1;0.9" dur="1.6s" repeatCount="indefinite" />
   </circle>
 
   {/* Tooltip mejor centrado */}
-  <g transform="translate(-20, -160)" opacity="0.95">
+  <g transform="translate(50, -160)" opacity="0.95">
     <rect x="-8" y="-28" width="190" height="38" rx="10"
           fill="#111827" stroke="#374151" />
     <text x="88" y="-5" fill="#e5e7eb" fontSize="14"
@@ -449,30 +483,58 @@ function SeatMapSVG({
                 // si "solo disponibles" está activo, oculta bloqueados salvo que ya estén seleccionados
                 if (shouldHide) return null;
 
-                return (
-                  <circle
-                    key={s.id}
-                    cx={s.x}
-                    cy={s.y}
-                    r={11}
-                    fill={fill}
-                    stroke="#111827"
-                    strokeWidth={2}
-                    // solo permite click si NO está bloqueado, o si ya está seleccionado (para poder deseleccionar)
-                    onClick={() => {
-                      if (isBlocked && !sel) return;
-                      onToggle(t.id, s.id);
-                    }}
-                    style={{ cursor: isBlocked && !sel ? "not-allowed" : "pointer", opacity: isBlocked && !sel ? 0.9 : 1 }}
-                  />
-                );
+                  return (
+                    <g
+                      key={s.id}
+                      onClick={() => {
+                        // solo permite click si NO está bloqueado, o si ya está seleccionado (para poder deseleccionar)
+                        if (isBlocked && !sel) return;
+                        onToggle(t.id, s.id);
+                      }}
+                      style={{
+                        cursor: isBlocked && !sel ? "not-allowed" : "pointer",
+                        opacity: isBlocked && !sel ? 0.9 : 1,
+                      }}
+                    >
+                      {/* Hitbox invisible más grande */}
+                      <circle
+                        cx={s.x}
+                        cy={s.y}
+                        r={26}                 // 👈 área clickeable grande
+                        fill="transparent"
+                        stroke="none"
+                      />
+
+                      {/* Círculo visible del asiento */}
+                      <circle
+                        cx={s.x}
+                        cy={s.y}
+                        r={18}                 // 👈 un poquito más grande que antes (11)
+                        fill={fill}
+                        stroke="#111827"
+                        strokeWidth={2}
+                      />
+
+                      <text
+                        x={s.x}
+                        y={s.y + 5}
+                        textAnchor="middle"
+                        fontSize={12}
+                        fill="#0b1220"
+                        style={{ pointerEvents: "none", fontWeight: 700 }}
+                      >
+                        {s.label}
+                      </text>
+                    </g>
+                  );
+
               })}
             </g>
           ))}
 
 
           {/* Leyenda */}
-          <g transform="translate(140, 1380)">
+          <g transform="translate(140, 1560)">
             <rect x="0" y="-34" width="600" height="52" fill="#0f1629" rx="12" />
             <line x1="20" y1="-10" x2="80" y2="-10" stroke="#1e62ff" strokeWidth={10} />
             <text x="92" y="-3" fill="#e5e7eb" fontSize={18}>
@@ -571,16 +633,56 @@ const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
     return map;
   }, [layout]);
 
-  // Selección → items + totales
+  // índice para obtener el label (A1, B3, etc.) a partir de tableId + seatId
+  const seatLabelByKey: Record<string, string> = useMemo(() => {
+    const map: Record<string, string> = {};
+    layout?.zones.forEach((z) =>
+      z.tables.forEach((t) =>
+        t.seats.forEach((s) => {
+          map[`${t.id}:${s.id}`] = s.label;
+        })
+      )
+    );
+    return map;
+  }, [layout]);
+
+
   const selectionItems = useMemo(() => {
-    if (!layout) return [] as Array<{ zoneId: string; tableId: string; seatIds: string[]; unitPrice: number }>;
-    const items: Array<{ zoneId: string; tableId: string; seatIds: string[]; unitPrice: number }> = [];
+    if (!layout) return [] as Array<{
+      zoneId: string;
+      tableId: string;
+      seatIds: string[];
+      seatLabels: string[];   // 👈 nuevo
+      unitPrice: number;
+    }>;
+
+    const items: Array<{
+      zoneId: string;
+      tableId: string;
+      seatIds: string[];
+      seatLabels: string[];
+      unitPrice: number;
+    }> = [];
+
     Object.entries(selected).forEach(([tableId, seatIds]) => {
       if (seatIds.length === 0) return;
-      items.push({ zoneId: zoneByTable[tableId], tableId, seatIds, unitPrice: priceByTable[tableId] });
+
+      const seatLabels = seatIds.map(
+        (seatId) => seatLabelByKey[`${tableId}:${seatId}`] ?? seatId
+      );
+
+      items.push({
+        zoneId: zoneByTable[tableId],
+        tableId,
+        seatIds,
+        seatLabels,
+        unitPrice: priceByTable[tableId],
+      });
     });
+
     return items;
-  }, [layout, priceByTable, zoneByTable, selected]);
+  }, [layout, priceByTable, zoneByTable, selected, seatLabelByKey]);
+
 
   const totals = useMemo(() => {
     if (!layout) return { subtotal: 0, fees: 0, total: 0, seatCount: 0 };
@@ -684,7 +786,7 @@ const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
                 >
                   <div>
                     <div style={{ fontWeight: 600 }}>{it.tableId}</div>
-                    <div style={{ fontSize: 12 }}>Asientos: {it.seatIds.join(", ")}</div>
+                    <div style={{ fontSize: 12 }}>Asientos: {it.seatLabels.join(", ")}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div>{pesos(it.unitPrice * it.seatIds.length, layout.currency)}</div>

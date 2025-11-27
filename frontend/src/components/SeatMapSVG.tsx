@@ -215,14 +215,14 @@ export default function SeatMapSVG({
             x="60"
             y="80"
             width="900"
-            height="600"
+            height="600" 
             fill="none"
             stroke="#d4af37"
             strokeWidth={8}
             rx={14}
           />
           <text x="80" y="120" fill="#e5e7eb" fontSize="26" fontWeight={700}>
-            ZONA ORO — 25 mesas × 10 asientos
+            ZONA ORO — 25 mesas × 12 asientos
           </text>
 
           {/* VIP */}
@@ -237,7 +237,7 @@ export default function SeatMapSVG({
             rx={14}
           />
           <text x="1010" y="120" fill="#e5e7eb" fontSize="26" fontWeight={700}>
-            ZONA VIP — 15 mesas × 10 asientos
+            ZONA VIP — 15 mesas × 12 asientos
           </text>
 
           {/* MESAS + SILLAS */}

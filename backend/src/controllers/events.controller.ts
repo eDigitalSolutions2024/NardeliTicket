@@ -46,7 +46,8 @@ export async function createEvent(req: Request, res: Response) {
       sessions = [],
       status,           // ⬅️ NUEVO
       featured,         // ⬅️ NUEVO
-      pricing           // ⬅️ NUEVO { vip, oro }
+      pricing,
+      disabledTables,           // ⬅️ NUEVO { vip, oro }
     } = req.body || {};
 
     if (!title || !venue || !city || !imageUrl) {
@@ -63,6 +64,9 @@ export async function createEvent(req: Request, res: Response) {
       oro: Number(pricing?.oro ?? 0),
     };
 
+    const normalizedDisabledTables: string[] = Array.isArray(disabledTables)
+    ? disabledTables.map((t: any) => String(t)) : [];
+
     const ev = await Event.create({
       title,
       venue,
@@ -73,6 +77,7 @@ export async function createEvent(req: Request, res: Response) {
       status,                 // ⬅️ guarda status
       featured: !!featured,   // ⬅️ guarda featured
       pricing: normalizedPricing, // ⬅️ NUEVO
+      disabledTables: normalizedDisabledTables,
     });
 
     res.status(201).json(ev);
@@ -91,7 +96,8 @@ export async function updateEvent(req: Request, res: Response) {
       category, sessions,
       status,           // ⬅️ NUEVO
       featured,         // ⬅️ NUEVO
-      pricing           // ⬅️ NUEVO { vip, oro }
+      pricing,
+      disabledTables,           // ⬅️ NUEVO { vip, oro }
     } = req.body || {};
 
     const update: any = {};
@@ -112,6 +118,10 @@ export async function updateEvent(req: Request, res: Response) {
     if (pricing && (pricing.vip !== undefined || pricing.oro !== undefined)) {
       if (pricing.vip !== undefined) update["pricing.vip"] = Number(pricing.vip);
       if (pricing.oro !== undefined) update["pricing.oro"] = Number(pricing.oro);
+    }
+
+    if (disabledTables !== undefined){
+      update.disabledTables = Array.isArray(disabledTables) ? disabledTables.map((t: any) => String(t)) : [];
     }
 
     const ev = await Event.findByIdAndUpdate(id, update, { new: true, runValidators: true, upsert: false });

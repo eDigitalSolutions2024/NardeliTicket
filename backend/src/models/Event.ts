@@ -1,4 +1,3 @@
-// src/models/Event.ts
 import { Schema, model, InferSchemaType } from "mongoose";
 
 const SessionSchema = new Schema(
@@ -40,6 +39,11 @@ const EventSchema = new Schema(
     pricing: { type: PricingSchema, default: () => ({ vip: 0, oro: 0 }) },
     pricingCents: { type: PricingCentsSchema, default: () => ({ vip: 0, oro: 0}) },
     layoutVersion: { type: Number, default: 1 },
+
+    disbledTables: {
+      type: [String],
+      default: [],
+    },
   },
   { timestamps: true }
 );

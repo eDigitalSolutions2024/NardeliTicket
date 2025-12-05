@@ -28,10 +28,12 @@ export default function SeatMapSVG({
   onToggle,
   selected,
   onlyAvailable,
+  blockedKeys,
 }: {
   onToggle: (tableId: string, seatId: string) => void;
   selected: Record<string, string[]>;
   onlyAvailable: boolean;
+  blockedKeys?: Set<string>;
 }) {
   // ------- Geometría con 25 (ORO) + 15 (VIP), 10 asientos por mesa -------
   const data = useMemo<MapPayload>(() => {
@@ -143,7 +145,13 @@ export default function SeatMapSVG({
   };
 
   const colorBy = (state: string) =>
-    state === "available" ? "#9ca3af" : state === "held" ? "#f59e0b" : "#ef4444";
+    state === "available"
+    ? "#9ca3af"
+    : state === "held"
+    ? "#f59e0b"
+    : state === "selected"
+    ? "#22c55e"
+    : "#ef4444";
 
   // helpers para mesa visual
   const renderTable = (t: TableGeom) => {
@@ -247,21 +255,54 @@ export default function SeatMapSVG({
                 {renderTable(table)}
                 {table.seats.map((s) => {
                   const sel = (selected[table.id] || []).includes(s.id);
-                  const state = s.status === "available" ? (sel ? "selected" : "available") : s.status;
+
+                  // 👉 clave única mesa+asiento
+                  const key = `${table.id}:${s.id}`;
+                  const isBlocked = blockedKeys?.has(key) ?? false;
+
+                  // estado base (lo que ya tenías)
+                  const baseState =
+                    s.status === "available" ? (sel ? "selected" : "available") : s.status;
+
+                  // si está bloqueado, lo tratamos como reservado
+                  const state = isBlocked ? "reserved" : baseState;
+
                   const fill = state === "selected" ? "#22c55e" : colorBy(state);
-                  if (onlyAvailable && s.status !== "available" && !sel) return null;
+
+                  // si está activado "solo disponibles", escondemos todo lo que no sea available,
+                  // excepto si ya está seleccionado
+                  if (onlyAvailable && state !== "available" && !sel) return null;
+
                   return (
                     <g
                       key={s.id}
-                      onClick={() => (s.status === "available" || sel) && onToggle(table.id, s.id)}
+                      onClick={() => {
+                        // ❗ no permitir seleccionar si está bloqueado y no estaba ya seleccionado
+                        if (isBlocked && !sel) return;
+                        // no permitir seleccionar si no es available y no estaba seleccionado
+                        if (state !== "available" && !sel) return;
+                        onToggle(table.id, s.id);
+                      }}
+                      style={{
+                        cursor: isBlocked && !sel ? "not-allowed" : "pointer",
+                        opacity: isBlocked && !sel ? 0.5 : 1,
+                      }}
                     >
-                      <circle cx={s.x} cy={s.y} r={10} fill={fill} stroke="#111827" strokeWidth={2} />
+                      <circle
+                        cx={s.x}
+                        cy={s.y}
+                        r={10}
+                        fill={fill}
+                        stroke="#111827"
+                        strokeWidth={2}
+                      />
                     </g>
                   );
                 })}
               </g>
             );
           })}
+
 
           {/* Leyenda */}
           <g transform="translate(70, 720)">

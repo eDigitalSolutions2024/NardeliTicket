@@ -40,7 +40,7 @@ const EventSchema = new Schema(
     pricingCents: { type: PricingCentsSchema, default: () => ({ vip: 0, oro: 0}) },
     layoutVersion: { type: Number, default: 1 },
 
-    disbledTables: {
+    disabledTables: {
       type: [String],
       default: [],
     },

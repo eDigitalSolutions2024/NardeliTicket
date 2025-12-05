@@ -1,10 +1,9 @@
+// src/pages/SeatSelectionPage.tsx
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getEvent, fetchBlockedSeats } from "../api/events"; // 👈 precios y nombre desde Mongo
 
-
 const SALON_IMG = "/salon_blueprint.jpg"; // ruta en /public
-
 
 /* ----------------------------- Types ----------------------------- */
 export type SeatStatus = "available" | "reserved" | "held";
@@ -25,6 +24,8 @@ export type EventLayout = {
   zones: Zone[];
   maxSeatsPerOrder?: number;
   feePct?: number;
+  /** Mesas deshabilitadas configuradas en el panel admin */
+  disabledTables?: string[];
 };
 
 function ModalImage({
@@ -78,11 +79,16 @@ function ModalImage({
         >
           Cerrar ✕
         </button>
-        <img src={src} alt={alt || "Plano del salón"} style={{ display: "block", maxWidth: "95vw", maxHeight: "90vh" }} />
+        <img
+          src={src}
+          alt={alt || "Plano del salón"}
+          style={{ display: "block", maxWidth: "95vw", maxHeight: "90vh" }}
+        />
       </div>
     </div>
   );
 }
+
 /* --------------------- Helpers --------------------- */
 function pesos(n: number, currency = "MXN") {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(n);
@@ -91,6 +97,16 @@ function pesos(n: number, currency = "MXN") {
 /* Carga layout desde API y mapea a EventLayout (precios y nombre reales) */
 async function fetchAvailability(eventId: string, eventName?: string): Promise<EventLayout> {
   const ev = await getEvent(eventId);
+
+  // 👇 soporta disabledTables y el posible typo disbledTables
+  const rawDisabled =
+    (ev as any).disabledTables ??
+    (ev as any).disbledTables ??
+    [];
+
+  console.log("Evento desde backend", ev);
+  console.log("Mesas deshabilitadas desde backend", rawDisabled);
+
   return {
     eventId: ev.id,
     eventName: eventName || ev.title || "Evento",
@@ -115,8 +131,10 @@ async function fetchAvailability(eventId: string, eventName?: string): Promise<E
         tables: [],
       },
     ],
+    disabledTables: rawDisabled,   // 👈 aquí
   };
 }
+
 
 /* ----------------------------- Small UI ----------------------------- */
 function Pill({ children }: { children: React.ReactNode }) {
@@ -189,16 +207,16 @@ const makePattern = ({
   // fila superior: 5 asientos
   [-72, topY],
   [-36, topY],
-  [0,   topY],
-  [36,  topY],
-  [72,  topY],
+  [0, topY],
+  [36, topY],
+  [72, topY],
 
   // fila inferior: 5 asientos
   [-72, bottomY],
   [-36, bottomY],
-  [0,   bottomY],
-  [36,  bottomY],
-  [72,  bottomY],
+  [0, bottomY],
+  [36, bottomY],
+  [72, bottomY],
 
   [leftX, 0],
   [rightX, 0],
@@ -206,7 +224,6 @@ const makePattern = ({
 
 const SEAT_PATTERN_VIP = makePattern(VIP_OFFSETS);
 const SEAT_PATTERN_ORO = makePattern(ORO_OFFSETS);
-
 
 const numToLetter = (n: number) =>
   String.fromCharCode("A".charCodeAt(0) + (n - 1));
@@ -245,7 +262,6 @@ function SeatMapSVG({
   onPreview: () => void; // 👈 nuevo
   blockedKeys?: Set<string>;
 }) {
-
   const tables = useMemo<TableGeom[]>(() => {
     const out: TableGeom[] = [];
     let seatGlobal = 0;
@@ -273,7 +289,15 @@ function SeatMapSVG({
             tableId: id,
           };
         });
-        out.push({ id, name: `Mesa VIP ${tVip}`, zoneId: "VIP", seats, capacity: seats.length, cx, cy });
+        out.push({
+          id,
+          name: `Mesa VIP ${tVip}`,
+          zoneId: "VIP",
+          seats,
+          capacity: seats.length,
+          cx,
+          cy,
+        });
       }
     }
 
@@ -300,7 +324,15 @@ function SeatMapSVG({
             tableId: id,
           };
         });
-        out.push({ id, name: `Mesa Oro ${tOro}`, zoneId: "ORO", seats, capacity: seats.length, cx, cy });
+        out.push({
+          id,
+          name: `Mesa Oro ${tOro}`,
+          zoneId: "ORO",
+          seats,
+          capacity: seats.length,
+          cx,
+          cy,
+        });
       }
     }
 
@@ -328,19 +360,20 @@ function SeatMapSVG({
   };
 
   const colorBy = (state: SeatStatus | "selected") =>
-    state === "selected" ? "#22c55e" : state === "available" ? "#9ca3af" : state === "held" ? "#f59e0b" : "#ef4444";
-
-  /*const numToLetter = (n: number) =>
-    String.fromCharCode("A".charCodeAt(0) + (n - 1));*/
+    state === "selected"
+      ? "#22c55e"
+      : state === "available"
+      ? "#9ca3af"
+      : state === "held"
+      ? "#f59e0b"
+      : "#ef4444";
 
   const renderTableRect = (t: TableGeom) => {
-    // t.id viene como "VIP-01", "ORO-15", etc.
     const [zone, numStr] = t.id.split("-");
     const num = parseInt(numStr, 10);
     const label =
-      !isNaN(num) && num >= 1
-        ? `${zone}-${numToLetter(num)}`
-        : t.id; // fallback por si algo raro
+      !isNaN(num) && num >= 1 ? `${zone}-${numToLetter(num)}`
+      : t.id;
 
     return (
       <g key={`${t.id}-rect`}>
@@ -358,21 +391,20 @@ function SeatMapSVG({
         <text
           x={t.cx}
           y={t.cy + 8}
-          fontSize={30}                   // 👈 más grande
+          fontSize={30}
           textAnchor="middle"
           fill="#334155"
           style={{
             pointerEvents: "none",
-            fontWeight: 900,             // 👈 más pesado
+            fontWeight: 900,
             letterSpacing: 0.6,
           }}
         >
-          {label}                         {/* VIP-A, ORO-C, etc */}
+          {label}
         </text>
       </g>
     );
   };
-
 
   return (
     <div style={{ background: "#0b1220", borderRadius: 12, overflow: "hidden" }}>
@@ -409,58 +441,73 @@ function SeatMapSVG({
               ZONA ORO — 25 mesas × 12 asientos
             </text>
           </g>
-{/* Botón lateral PREVIEW – versión grande */}
-<g transform="translate(2860, 320)" role="button" tabIndex={0}
-   onClick={onPreview}
-   onKeyDown={(e: any) => (e.key === "Enter" || e.key === " ") && onPreview()}
-   style={{ cursor: "pointer" }}>
-  {/* Efecto glow dorado */}
-  <filter id="btnGlowBig" x="-50%" y="-50%" width="200%" height="200%">
-    <feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="#000" floodOpacity="0.6" />
-    <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#fbbf24" floodOpacity="0.9" />
-  </filter>
 
-  {/* Cuerpo del botón */}
-  <rect x="50" y="-130" width="70" height="260" rx="18"
-        fill="#111" stroke="#fbbf24" strokeWidth={4}
-        filter="url(#btnGlowBig)" />
+          {/* Botón lateral PREVIEW – versión grande */}
+          <g
+            transform="translate(2860, 320)"
+            role="button"
+            tabIndex={0}
+            onClick={onPreview}
+            onKeyDown={(e: any) => (e.key === "Enter" || e.key === " ") && onPreview()}
+            style={{ cursor: "pointer" }}
+          >
+            <filter id="btnGlowBig" x="-50%" y="-50%" width="200%" height="200%">
+              <feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="#000" floodOpacity="0.6" />
+              <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#fbbf24" floodOpacity="0.9" />
+            </filter>
 
-  {/* Ícono cámara */}
-  <g transform="translate(85, -85)">
-    <rect x="-13" y="-10" width="26" height="20" rx="4" fill="#e5e7eb" />
-    <circle cx="0" cy="0" r="5" fill="#111827" />
-    <rect x="10" y="-8" width="8" height="6" rx="2" fill="#e5e7eb" />
-  </g>
+            <rect
+              x="50"
+              y="-130"
+              width="70"
+              height="260"
+              rx="18"
+              fill="#111"
+              stroke="#fbbf24"
+              strokeWidth={4}
+              filter="url(#btnGlowBig)"
+            />
 
-  {/* Texto vertical más grande */}
-  <text x="35" y="75" fill="#e5e7eb"
-        fontSize="18" fontWeight="900"
-        textAnchor="middle"
-        transform="rotate(-90 35,20)"
-        style={{ letterSpacing: 3, userSelect: "none" }}>
-    PREVIEW
-  </text>
+            <g transform="translate(85, -85)">
+              <rect x="-13" y="-10" width="26" height="20" rx="4" fill="#e5e7eb" />
+              <circle cx="0" cy="0" r="5" fill="#111827" />
+              <rect x="10" y="-8" width="8" height="6" rx="2" fill="#e5e7eb" />
+            </g>
 
-  {/* Ping animado más notorio */}
-  <circle cx="80" cy="115" r="8" fill="#fbbf24" opacity="0.9">
-    <animate attributeName="r" values="8;18;8" dur="1.6s" repeatCount="indefinite" />
-    <animate attributeName="opacity" values="0.9;0.1;0.9" dur="1.6s" repeatCount="indefinite" />
-  </circle>
+            <text
+              x="35"
+              y="75"
+              fill="#e5e7eb"
+              fontSize="18"
+              fontWeight="900"
+              textAnchor="middle"
+              transform="rotate(-90 35,20)"
+              style={{ letterSpacing: 3, userSelect: "none" }}
+            >
+              PREVIEW
+            </text>
 
-  {/* Tooltip mejor centrado */}
-  <g transform="translate(50, -160)" opacity="0.95">
-    <rect x="-8" y="-28" width="190" height="38" rx="10"
-          fill="#111827" stroke="#374151" />
-    <text x="88" y="-5" fill="#e5e7eb" fontSize="14"
-          fontWeight="600" textAnchor="middle"
-          style={{ pointerEvents: "none" }}>
-      Ver plano del salón
-    </text>
-    <polygon points="86,8 96,-2 76,-2" fill="#111827" />
-  </g>
-</g>
+            <circle cx="80" cy="115" r="8" fill="#fbbf24" opacity="0.9">
+              <animate attributeName="r" values="8;18;8" dur="1.6s" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0.9;0.1;0.9" dur="1.6s" repeatCount="indefinite" />
+            </circle>
 
-
+            <g transform="translate(50, -160)" opacity="0.95">
+              <rect x="-8" y="-28" width="190" height="38" rx="10" fill="#111827" stroke="#374151" />
+              <text
+                x="88"
+                y="-5"
+                fill="#e5e7eb"
+                fontSize="14"
+                fontWeight="600"
+                textAnchor="middle"
+                style={{ pointerEvents: "none" }}
+              >
+                Ver plano del salón
+              </text>
+              <polygon points="86,8 96,-2 76,-2" fill="#111827" />
+            </g>
+          </g>
 
           {/* Mesas + asientos */}
           {tables.map((t) => (
@@ -469,7 +516,7 @@ function SeatMapSVG({
               {t.seats.map((s) => {
                 const sel = (selected[t.id] || []).includes(s.id);
 
-                // 👉 bloqueo por backend
+                // 👉 bloqueo por backend + admin
                 const key = `${t.id}:${s.id}`;
                 const isBlocked = blockedKeys?.has(key) ?? false;
 
@@ -478,60 +525,51 @@ function SeatMapSVG({
                   isBlocked ? "reserved" : s.status === "available" ? (sel ? "selected" : "available") : s.status;
                 const fill = colorBy(visualState as any);
 
-                const shouldHide = onlyAvailable && !sel && (visualState === "held");
-
-                // si "solo disponibles" está activo, oculta bloqueados salvo que ya estén seleccionados
+                const shouldHide = onlyAvailable && !sel && visualState === "held";
                 if (shouldHide) return null;
 
-                  return (
-                    <g
-                      key={s.id}
-                      onClick={() => {
-                        // solo permite click si NO está bloqueado, o si ya está seleccionado (para poder deseleccionar)
-                        if (isBlocked && !sel) return;
-                        onToggle(t.id, s.id);
-                      }}
-                      style={{
-                        cursor: isBlocked && !sel ? "not-allowed" : "pointer",
-                        opacity: isBlocked && !sel ? 0.9 : 1,
-                      }}
+                return (
+                  <g
+                    key={s.id}
+                    onClick={() => {
+                      if (isBlocked && !sel) return;
+                      onToggle(t.id, s.id);
+                    }}
+                    style={{
+                      cursor: isBlocked && !sel ? "not-allowed" : "pointer",
+                      opacity: isBlocked && !sel ? 0.9 : 1,
+                    }}
+                  >
+                    <circle
+                      cx={s.x}
+                      cy={s.y}
+                      r={26}
+                      fill="transparent"
+                      stroke="none"
+                    />
+                    <circle
+                      cx={s.x}
+                      cy={s.y}
+                      r={18}
+                      fill={fill}
+                      stroke="#111827"
+                      strokeWidth={2}
+                    />
+                    <text
+                      x={s.x}
+                      y={s.y + 5}
+                      textAnchor="middle"
+                      fontSize={12}
+                      fill="#0b1220"
+                      style={{ pointerEvents: "none", fontWeight: 700 }}
                     >
-                      {/* Hitbox invisible más grande */}
-                      <circle
-                        cx={s.x}
-                        cy={s.y}
-                        r={26}                 // 👈 área clickeable grande
-                        fill="transparent"
-                        stroke="none"
-                      />
-
-                      {/* Círculo visible del asiento */}
-                      <circle
-                        cx={s.x}
-                        cy={s.y}
-                        r={18}                 // 👈 un poquito más grande que antes (11)
-                        fill={fill}
-                        stroke="#111827"
-                        strokeWidth={2}
-                      />
-
-                      <text
-                        x={s.x}
-                        y={s.y + 5}
-                        textAnchor="middle"
-                        fontSize={12}
-                        fill="#0b1220"
-                        style={{ pointerEvents: "none", fontWeight: 700 }}
-                      >
-                        {s.label}
-                      </text>
-                    </g>
-                  );
-
+                      {s.label}
+                    </text>
+                  </g>
+                );
               })}
             </g>
           ))}
-
 
           {/* Leyenda */}
           <g transform="translate(140, 1560)">
@@ -557,7 +595,8 @@ export default function SeatSelectionPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { sessionDate, eventName } = (location.state ?? {}) as { sessionDate?: string; eventName?: string };
-  const [showPreview, setShowPreview] = useState(false);  
+  const [showPreview, setShowPreview] = useState(false);
+
   useEffect(() => {
     if (!sessionDate && id) navigate(`/events/${id}`, { replace: true });
   }, [sessionDate, id, navigate]);
@@ -567,21 +606,25 @@ export default function SeatSelectionPage() {
   const [layout, setLayout] = useState<EventLayout | null>(null);
   const [onlyAvailable, setOnlyAvailable] = useState(true);
   const [selected, setSelected] = useState<Record<string, string[]>>({});
-  const [blockedKeys, setBlockedKeys] = useState<Set<string>>(new Set());
+  const [blockedFromSales, setBlockedFromSales] = useState<Set<string>>(new Set());
 
+  // 1) bloqueos por ventas (SeatHold)
   useEffect(() => {
     let mounted = true;
     (async () => {
-      try{
+      try {
         const blocked = await fetchBlockedSeats(eventId);
-        if (mounted) setBlockedKeys(new Set(blocked));
+        if (mounted) setBlockedFromSales(new Set(blocked));
       } catch (e) {
         console.error("No se puedieron cargar asientos bloqueados");
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [eventId]);
 
+  // 2) layout + disabledTables desde el evento
   useEffect(() => {
     fetchAvailability(eventId, eventName).then(setLayout);
   }, [eventId, eventName]);
@@ -595,31 +638,35 @@ export default function SeatSelectionPage() {
     sessionStorage.setItem(`NT_SEL_${eventId}`, JSON.stringify(selected));
   }, [eventId, selected]);
 
- // Inyectar mesas al layout
-type TableGeomLocal = TableGeom; // solo para tipado local
-const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
-  setLayout((prev) => {
-    if (!prev) return prev;
-    const clone: EventLayout = JSON.parse(JSON.stringify(prev));
-    const vip = tables.filter((t) => t.zoneId === "VIP");
-    const oro = tables.filter((t) => t.zoneId === "ORO");
-    const vipZone = clone.zones.find((z) => z.id === "VIP")!;
-    const oroZone = clone.zones.find((z) => z.id === "ORO")!;
-    vipZone.tables = vip.map((t) => ({
-      id: t.id,
-      name: t.name,
-      capacity: t.capacity,
-      seats: t.seats.map((s) => ({ id: s.id, label: s.label, status: s.status })),
-    }));
-    oroZone.tables = oro.map((t) => ({
-      id: t.id,
-      name: t.name,
-      capacity: t.capacity,
-      seats: t.seats.map((s) => ({ id: s.id, label: s.label, status: s.status })),
-    }));
-    return clone;
-  });
-}, []);
+  // Inyectar mesas al layout
+  type TableGeomLocal = TableGeom; // solo para tipado local
+  const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
+    setLayout((prev) => {
+      if (!prev) return prev;
+      const clone: EventLayout = JSON.parse(JSON.stringify(prev));
+      const vip = tables.filter((t) => t.zoneId === "VIP");
+      const oro = tables.filter((t) => t.zoneId === "ORO");
+      const vipZone = clone.zones.find((z) => z.id === "VIP")!;
+      const oroZone = clone.zones.find((z) => z.id === "ORO")!;
+      vipZone.tables = vip.map((t) => ({
+        id: t.id,
+        name: t.name,
+        capacity: t.capacity,
+        seats: t.seats.map((s) => ({ id: s.id, label: s.label, status: s.status })),
+      }));
+      oroZone.tables = oro.map((t) => ({
+        id: t.id,
+        name: t.name,
+        capacity: t.capacity,
+        seats: t.seats.map((s) => ({ id: s.id, label: s.label, status: s.status })),
+      }));
+
+      
+
+
+      return clone;
+    });
+  }, []);
 
   // Índices auxiliares
   const priceByTable: Record<string, number> = useMemo(() => {
@@ -646,15 +693,39 @@ const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
     return map;
   }, [layout]);
 
+  // 3) Combinar bloqueos de ventas + mesas deshabilitadas por el admin
+  const blockedKeys = useMemo(() => {
+    const merged = new Set<string>(blockedFromSales);
+
+    if (layout?.disabledTables && layout.zones?.length) {
+      const disabledSet = new Set(layout.disabledTables);
+      layout.zones.forEach((z) => {
+        z.tables.forEach((t) => {
+          if (disabledSet.has(t.id)) {
+            t.seats.forEach((s) => {
+              merged.add(`${t.id}:${s.id}`);
+            });
+          }
+        });
+      });
+    }
+
+    console.log("Mesas deshabilitadas", layout?.disabledTables);
+    console.log("Total keys bloqueadas", merged.size); 
+
+    return merged;
+  }, [blockedFromSales, layout]);
+
 
   const selectionItems = useMemo(() => {
-    if (!layout) return [] as Array<{
-      zoneId: string;
-      tableId: string;
-      seatIds: string[];
-      seatLabels: string[];   // 👈 nuevo
-      unitPrice: number;
-    }>;
+    if (!layout)
+      return [] as Array<{
+        zoneId: string;
+        tableId: string;
+        seatIds: string[];
+        seatLabels: string[]; // 👈
+        unitPrice: number;
+      }>;
 
     const items: Array<{
       zoneId: string;
@@ -682,7 +753,6 @@ const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
 
     return items;
   }, [layout, priceByTable, zoneByTable, selected, seatLabelByKey]);
-
 
   const totals = useMemo(() => {
     if (!layout) return { subtotal: 0, fees: 0, total: 0, seatCount: 0 };
@@ -749,7 +819,7 @@ const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
           onToggle={handleToggleFromMap}
           onReady={injectTablesIntoLayout}
           onPreview={() => setShowPreview(true)}
-          blockedKeys={blockedKeys}// 👈 nuevo
+          blockedKeys={blockedKeys}
         />
       </div>
 
@@ -813,31 +883,27 @@ const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
             )}
             <button
               onClick={() => {
-                  if (layout.maxSeatsPerOrder && totals.seatCount > (layout.maxSeatsPerOrder ?? Infinity)) return;
+                if (layout.maxSeatsPerOrder && totals.seatCount > (layout.maxSeatsPerOrder ?? Infinity)) return;
 
-                  const rawToken = localStorage.getItem("token");
-                  const hasToken =
-                    !!rawToken && rawToken !== "undefined" && rawToken !== "null" && rawToken.trim() !== "";
+                const rawToken = localStorage.getItem("token");
+                const hasToken =
+                  !!rawToken && rawToken !== "undefined" && rawToken !== "null" && rawToken.trim() !== "";
 
-                  const payload = {
-                    eventId: layout.eventId,
-                    items: selectionItems,
-                    totals,
-                    sessionDate,
-                  };
+                const payload = {
+                  eventId: layout.eventId,
+                  items: selectionItems,
+                  totals,
+                  sessionDate,
+                };
 
-                  if (!hasToken) {
-                    sessionStorage.setItem("NT_PENDING_CHECKOUT", JSON.stringify(payload));
-                    // ⬇️ AuthPage es tu layout (archivo AuthPage.tsx)
-                    navigate("/auth?tab=login", { state: { redirectTo: "/cart" }, replace: true });
-                    return;
-                  }
+                if (!hasToken) {
+                  sessionStorage.setItem("NT_PENDING_CHECKOUT", JSON.stringify(payload));
+                  navigate("/auth?tab=login", { state: { redirectTo: "/cart" }, replace: true });
+                  return;
+                }
 
-                  // Con sesión → al carrito
-                  navigate("/cart", { state: payload });
-                }}
-
-
+                navigate("/cart", { state: payload });
+              }}
               disabled={selectionItems.length === 0 || !!maxReached}
               style={{
                 width: "100%",

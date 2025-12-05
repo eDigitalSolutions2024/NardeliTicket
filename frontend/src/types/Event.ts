@@ -18,4 +18,5 @@ export interface EventItem {
   featured?: boolean;
   pricing?: TicketPricing;
   createdAt?: string;
+  disabledTables?: string[];
 }

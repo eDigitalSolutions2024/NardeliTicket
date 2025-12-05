@@ -24,6 +24,7 @@ function statusLabel(s: string) {
 }
 
 /* ==== tipos/estado del form ==== */
+// Incluimos disabledTables en el estado del form
 type FormState = Omit<EventItem, "id"> & { id?: string };
 const emptyForm: FormState = {
   title: "",
@@ -35,6 +36,7 @@ const emptyForm: FormState = {
   status: "draft",
   featured: false,
   pricing: { vip: 0, oro: 0 },
+  disabledTables: [],
 };
 
 /* ==== utils fechas ==== */
@@ -67,6 +69,8 @@ export default function AdminDashboard() {
   const [sessionInput, setSessionInput] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [q, setQ] = useState("");
+
+  const [showLayoutModal, setShowLayoutModal] = useState(false);
 
   const isEditing = !!form.id;
 
@@ -118,6 +122,7 @@ export default function AdminDashboard() {
         vip: Number(form.pricing?.vip ?? 0),
         oro: Number(form.pricing?.oro ?? 0),
       },
+      disabledTables: form.disabledTables ?? [],
     };
 
     setSaving(true);
@@ -153,6 +158,8 @@ export default function AdminDashboard() {
       status: (ev.status ?? "draft") as EventStatus,
       featured: Boolean(ev.featured),
       pricing: { vip: ev.pricing?.vip ?? 0, oro: ev.pricing?.oro ?? 0 },
+      disabledTables: ev.disabledTables ?? [],
+      createdAt: ev.createdAt,
     });
     setSessionInput("");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -408,6 +415,41 @@ export default function AdminDashboard() {
               )}
             </div>
 
+            {/* Layout / Mesas deshabilitadas */}
+            <div
+              style={{
+                marginTop: 16,
+                padding: 12,
+                borderRadius: 10,
+                border: "1px solid #e5e7eb",
+                background: "#f9fafb",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <strong>Layout del salón</strong>
+                <span style={{ fontSize: 12, color: "#6b7280" }}>
+                  Selecciona las mesas que NO se podrán vender para este evento.
+                </span>
+              </div>
+              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12 }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowLayoutModal(true)}
+                >
+                  Configurar layout (mesas)
+                </button>
+                {form.disabledTables && form.disabledTables.length > 0 ? (
+                  <small style={{ color: "#374151" }}>
+                    Mesas deshabilitadas:{" "}
+                    <strong>{form.disabledTables.join(", ")}</strong>
+                  </small>
+                ) : (
+                  <small style={{ color: "#6b7280" }}>No hay mesas deshabilitadas.</small>
+                )}
+              </div>
+            </div>
+
             <div className="form-actions" style={{ marginTop: 12, display: "flex", gap: 8 }}>
               <button type="submit" disabled={saving} className="btn">
                 {isEditing ? "Guardar cambios" : "Crear evento"}
@@ -493,7 +535,9 @@ export default function AdminDashboard() {
                           />
                         </td>
                         <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                          <button onClick={() => onEdit(ev)} className="btn-secondary">Editar</button>{" "}
+                          <button onClick={() => onEdit(ev)} className="btn-secondary">
+                            Editar
+                          </button>{" "}
                           <button onClick={() => onDelete(ev.id)} className="btn-danger">
                             Eliminar
                           </button>
@@ -504,6 +548,14 @@ export default function AdminDashboard() {
                 </tbody>
               </table>
             </div>
+          )}
+
+          {showLayoutModal && (
+            <LayoutEditorModal
+              disabledTables={form.disabledTables ?? []}
+              onChange={(next) => setField("disabledTables", next)}
+              onClose={() => setShowLayoutModal(false)}
+            />
           )}
         </>
       ) : (
@@ -780,6 +832,352 @@ function SalesTab({ events }: { events: EventItem[] }) {
             )}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+/* =========================
+   Modal para configurar layout
+   ========================= */
+
+type LayoutEditorModalProps = {
+  disabledTables: string[];
+  onChange: (next: string[]) => void;
+  onClose: () => void;
+};
+
+function LayoutEditorModal({ disabledTables, onChange, onClose }: LayoutEditorModalProps) {
+  type LayoutTable = {
+    id: string;
+    zoneId: "VIP" | "ORO";
+    cx: number;
+    cy: number;
+    label: string;
+  };
+
+  const numToLetter = (n: number) =>
+    String.fromCharCode("A".charCodeAt(0) + (n - 1));
+
+  // Geometría simplificada basada en SeatSelectionPage
+  const tables: LayoutTable[] = useMemo(() => {
+    const out: LayoutTable[] = [];
+
+    // Constantes aproximadas del mapa grande
+    const TABLE_W = 190;
+    const TABLE_H = 120;
+    const STEP_X = 340;
+    const STEP_Y = 250;
+
+    // VIP (izquierda) 3x5
+    const vipOrigin = { x: 260, y: 300 };
+    let tVip = 0;
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 3; c++) {
+        tVip++;
+        const id = `VIP-${String(tVip).padStart(2, "0")}`;
+        const cx = vipOrigin.x + c * STEP_X;
+        const cy = vipOrigin.y + r * STEP_Y;
+        const letter = numToLetter(tVip);
+        out.push({
+          id,
+          zoneId: "VIP",
+          cx,
+          cy,
+          label: `VIP-${letter}`,
+        });
+      }
+    }
+
+    // ORO (derecha) 5x5
+    const oroOrigin = { x: 1350, y: 300 };
+    let tOro = 0;
+    for (let r = 0; r < 5; r++) {
+      for (let c = 0; c < 5; c++) {
+        tOro++;
+        const id = `ORO-${String(tOro).padStart(2, "0")}`;
+        const cx = oroOrigin.x + c * STEP_X;
+        const cy = oroOrigin.y + r * STEP_Y;
+        const letter = numToLetter(tOro);
+        out.push({
+          id,
+          zoneId: "ORO",
+          cx,
+          cy,
+          label: `ORO-${letter}`,
+        });
+      }
+    }
+
+    return out;
+  }, []);
+
+  const [localDisabled, setLocalDisabled] = useState<Set<string>>(
+    () => new Set(disabledTables)
+  );
+
+  const toggleTable = (id: string) => {
+    setLocalDisabled((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSave = () => {
+    onChange(Array.from(localDisabled));
+    onClose();
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15,23,42,0.75)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 100,
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          background: "#0b1220",
+          color: "#e5e7eb",
+          borderRadius: 14,
+          border: "1px solid #1f2937",
+          maxWidth: "1200px",
+          width: "100%",
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        <header
+          style={{
+            padding: "12px 16px",
+            borderBottom: "1px solid #1f2937",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <h2 style={{ margin: 0, fontSize: 18 }}>Configurar layout del evento</h2>
+          <span style={{ fontSize: 12, color: "#9ca3af" }}>
+            Haz clic en una mesa para habilitarla o deshabilitarla.
+          </span>
+          <button
+            onClick={onClose}
+            style={{
+              marginLeft: "auto",
+              borderRadius: 999,
+              padding: "4px 10px",
+              border: "1px solid #374151",
+              background: "#111827",
+              color: "#e5e7eb",
+              cursor: "pointer",
+            }}
+          >
+            Cerrar ✕
+          </button>
+        </header>
+
+        <div style={{ padding: 12, flex: 1, overflow: "auto" }}>
+          <svg
+            viewBox="0 0 3000 1600"
+            style={{ width: "100%", maxHeight: 600 }}
+          >
+            {/* Stage */}
+            <g transform="translate(40, 520)">
+              <rect x="0" y="-190" width="88" height="380" fill="#111" rx="10" />
+              <text
+                x="44"
+                y="0"
+                fill="#e5e7eb"
+                fontSize="20"
+                textAnchor="middle"
+                transform="rotate(-90 44,0)"
+              >
+                STAGE
+              </text>
+            </g>
+
+            {/* Marcos zona VIP / ORO */}
+            <rect
+              x="100"
+              y="120"
+              width="1025"
+              height="1400"
+              fill="none"
+              stroke="#1e62ff"
+              strokeWidth={14}
+              rx={20}
+            />
+            <g transform="translate(140, 205)">
+              <text
+                x="200"
+                y="-105"
+                fill="#e5e7eb"
+                fontSize={34}
+                fontWeight={900}
+              >
+                ZONA VIP — 15 mesas
+              </text>
+            </g>
+
+            <rect
+              x="1150"
+              y="120"
+              width="1800"
+              height="1400"
+              fill="none"
+              stroke="#d4af37"
+              strokeWidth={14}
+              rx={20}
+            />
+            <g transform="translate(1420, 205)">
+              <text
+                x="400"
+                y="-105"
+                fill="#e5e7eb"
+                fontSize={34}
+                fontWeight={900}
+              >
+                ZONA ORO — 25 mesas
+              </text>
+            </g>
+
+            {/* Mesas */}
+            {tables.map((t) => {
+              const isDisabled = localDisabled.has(t.id);
+              const TABLE_W = 190;
+              const TABLE_H = 120;
+              const TABLE_R = 18;
+
+              const strokeBase = t.zoneId === "VIP" ? "#1e62ff" : "#d4af37";
+
+              return (
+                <g
+                  key={t.id}
+                  onClick={() => toggleTable(t.id)}
+                  style={{ cursor: "pointer" }}
+                >
+                  <rect
+                    x={t.cx - TABLE_W / 2}
+                    y={t.cy - TABLE_H / 2}
+                    width={TABLE_W}
+                    height={TABLE_H}
+                    rx={TABLE_R}
+                    ry={TABLE_R}
+                    fill={isDisabled ? "#111827" : "#e9eef7"}
+                    stroke={isDisabled ? "#ef4444" : strokeBase}
+                    strokeWidth={isDisabled ? 6 : 3}
+                    opacity={isDisabled ? 0.75 : 1}
+                  />
+                  <text
+                    x={t.cx}
+                    y={t.cy + 8}
+                    fontSize={30}
+                    textAnchor="middle"
+                    fill={isDisabled ? "#fca5a5" : "#334155"}
+                    style={{
+                      pointerEvents: "none",
+                      fontWeight: 900,
+                      letterSpacing: 0.6,
+                    }}
+                  >
+                    {t.label}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Leyenda */}
+            <g transform="translate(140, 1560)">
+              <rect
+                x="0"
+                y="-34"
+                width="720"
+                height="52"
+                fill="#0f1629"
+                rx="12"
+              />
+              <line
+                x1="20"
+                y1="-10"
+                x2="80"
+                y2="-10"
+                stroke="#22c55e"
+                strokeWidth={10}
+              />
+              <text x="92" y="-3" fill="#e5e7eb" fontSize={18}>
+                Mesa habilitada (a la venta)
+              </text>
+              <line
+                x1="360"
+                y1="-10"
+                x2="420"
+                y2="-10"
+                stroke="#ef4444"
+                strokeWidth={10}
+              />
+              <text x="432" y="-3" fill="#e5e7eb" fontSize={18}>
+                Mesa deshabilitada
+              </text>
+            </g>
+          </svg>
+        </div>
+
+        <footer
+          style={{
+            padding: 12,
+            borderTop: "1px solid #1f2937",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <div style={{ fontSize: 13, color: "#9ca3af" }}>
+            Mesas deshabilitadas:{" "}
+            {localDisabled.size
+              ? Array.from(localDisabled).join(", ")
+              : "ninguna"}
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => setLocalDisabled(new Set())}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 8,
+                border: "1px solid #4b5563",
+                background: "#111827",
+                color: "#e5e7eb",
+                cursor: "pointer",
+              }}
+            >
+              Limpiar
+            </button>
+            <button
+              onClick={handleSave}
+              style={{
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: "none",
+                background: "#22c55e",
+                color: "#0b1120",
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Guardar layout
+            </button>
+          </div>
+        </footer>
       </div>
     </div>
   );

@@ -57,7 +57,9 @@ const mapToEventItem = (d: any): EventItem => ({
     vip: d.pricing?.vip ?? 0,
     oro: d.pricing?.oro ?? 0,
   },
+  disabledTables: Array.isArray(d.disabledTables) ? d.disabledTables : [], // 👈 NUEVO
 });
+
 
 // Para crear: incluimos todo lo necesario explícitamente
 function toCreateBody(p: Partial<EventItem>) {
@@ -78,6 +80,13 @@ function toCreateBody(p: Partial<EventItem>) {
       oro: p.pricing.oro,
     };
   }
+
+    if (p.disabledTables) {
+    body.disabledTables = p.disabledTables;       // 👈 NUEVO
+  }
+
+
+  
   return body;
 }
 
@@ -103,6 +112,10 @@ function toUpdateBody(p: Partial<EventItem>) {
     body.pricing = {};
     if (p.pricing.vip !== undefined) body.pricing.vip = Number(p.pricing.vip);
     if (p.pricing.oro !== undefined) body.pricing.oro = Number(p.pricing.oro);
+  }
+
+    if (p.disabledTables !== undefined) {
+    body.disabledTables = p.disabledTables;   // 👈 NUEVO
   }
 
   return body;

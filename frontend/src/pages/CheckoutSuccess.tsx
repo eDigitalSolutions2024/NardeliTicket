@@ -8,6 +8,9 @@ type LocationState = {
   reservaId?: string;
   ticketIds?: string[];
   phone?: string;
+  // método de pago y datos del comprador (para efectivo)
+  paymentMethod?: "card" | "cash";
+  buyerName?: string;
 };
 
 function sanitizePhone(input: string): string {
@@ -38,12 +41,20 @@ function getPhoneFromStorage(): string | null {
   }
 }
 
-// 🔗 PDF por boleto: http://localhost:4000/api/checkout/tickets/<ticketId>.pdf
+// 🔗 (por si algún día quisieras volver a PDFs individuales)
+// http://localhost:4000/api/checkout/tickets/<ticketId>.pdf
 function buildTicketPdfUrl(tid: string): string {
   const base = API_BASE.replace(/\/+$/, "");
   const hasApi = /\/api$/.test(base);
   const root = hasApi ? base : `${base}/api`;
   return `${root}/checkout/tickets/${tid}.pdf`;
+}
+
+// 🔗 PDF combinado por orden: /files/tickets/tickets_order_<orderId>.pdf
+function buildOrderPdfUrl(orderId: string): string {
+  const base = API_BASE.replace(/\/+$/, "");
+  const apiRoot = base.replace(/\/api$/, ""); // http://localhost:4000
+  return `${apiRoot}/files/tickets/tickets_order_${orderId}.pdf`;
 }
 
 export default function CheckoutSuccess() {
@@ -52,6 +63,7 @@ export default function CheckoutSuccess() {
   const [searchParams] = useSearchParams();
 
   const [generatedUrls, setGeneratedUrls] = useState<string[]>([]);
+  const [orderPdfUrl, setOrderPdfUrl] = useState<string | null>(null);
   const [loadingGen, setLoadingGen] = useState(false);
   const [errorGen, setErrorGen] = useState<string | null>(null);
 
@@ -70,12 +82,22 @@ export default function CheckoutSuccess() {
     searchParams.get("reservaId") ||
     undefined;
 
+  // método de pago y nombre del cliente (cash)
+  const paymentMethod: "card" | "cash" =
+    state.paymentMethod || (searchParams.get("pm") === "cash" ? "cash" : "card");
+
+  const buyerName: string = state.buyerName || searchParams.get("buyerName") || "";
+
   // ticketIds por query (?ticketIds=a,b,c) o (?ticketId=uno)
   const ticketIdsFromQuery = (() => {
     const one = searchParams.get("ticketId");
     const many = searchParams.get("ticketIds");
     if (one) return [one];
-    if (many) return many.split(",").map((s) => s.trim()).filter(Boolean);
+    if (many)
+      return many
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     return undefined;
   })();
 
@@ -90,9 +112,10 @@ export default function CheckoutSuccess() {
     return fromState || fromQuery || fromStorage || "";
   });
 
-  // 1) Polling corto para esperar al webhook (si hay orderId y aún no hay ticketIds)
+  // 1) Polling corto para esperar al webhook (solo tiene sentido para tarjeta)
   useEffect(() => {
     let cancelled = false;
+    if (paymentMethod !== "card") return;
     if (!orderId || (ticketIds && ticketIds.length)) return;
 
     let attempts = 0;
@@ -116,67 +139,84 @@ export default function CheckoutSuccess() {
     }
 
     tryFetchTickets();
-    return () => { cancelled = true; };
-  }, [orderId, ticketIds]);
+    return () => {
+      cancelled = true;
+    };
+  }, [orderId, ticketIds, paymentMethod]);
 
-  // 2) Si ya tengo ticketIds pero aún no tengo PDFs generados, intenta generarlos 1 vez
+  // 2) Autogenerar PDFs
+  //
+  // - Efectivo: en cuanto hay orderId (orden ya viene pagada).
+  // - Tarjeta: solo cuando ya hay ticketIds (webhook terminó).
   const triedAutoGenRef = useRef(false);
   useEffect(() => {
     if (triedAutoGenRef.current) return;
     if (!orderId) return;
-    if (!ticketIds || ticketIds.length === 0) return;
-    if (generatedUrls.length > 0) return;
+    if (orderPdfUrl) return;
+
+    const needsTicketsFirst = paymentMethod === "card";
+    if (needsTicketsFirst && (!ticketIds || ticketIds.length === 0)) return;
 
     triedAutoGenRef.current = true;
+
     (async () => {
       try {
         setLoadingGen(true);
         const { data } = await api.post(`/checkout/orders/${orderId}/tickets/generate`);
-        const urls: string[] = Array.isArray(data?.files)
-          ? data.files.map((f: any) => f.url).filter(Boolean)
-          : [];
+
+        const urls: string[] = [];
+        if (data?.file?.url) {
+          urls.push(data.file.url);
+          setOrderPdfUrl(data.file.url);
+        } else {
+          const fallback = buildOrderPdfUrl(orderId);
+          urls.push(fallback);
+          setOrderPdfUrl(fallback);
+        }
+
         const ids: string[] = Array.isArray(data?.files)
           ? data.files.map((f: any) => f.ticketId).filter(Boolean)
           : [];
-        if (urls.length) setGeneratedUrls(urls);
         if (ids.length) setTicketIds(ids);
-      } catch (e: any) {
-        // no bloquear la vista; el usuario puede usar el botón "Generar PDFs"
+
+        if (urls.length) setGeneratedUrls(urls);
+      } catch (e) {
+        console.error("auto-generate PDFs error:", e);
+        // no bloqueamos la vista; el usuario puede usar el botón manual
       } finally {
         setLoadingGen(false);
       }
     })();
-  }, [orderId, ticketIds, generatedUrls.length]);
+  }, [orderId, ticketIds, orderPdfUrl, paymentMethod]);
 
-  // 3) Envío automático por WhatsApp SOLO cuando hay phone y (ticketIds o pdfUrls)
+  // 3) Envío automático por WhatsApp SOLO cuando hay phone y ya tenemos el PDF combinado
   useEffect(() => {
     if (alreadySentRef.current) return;
-    const ok =
-      !!sanitizePhone(phone || "") &&
-      ( (ticketIds?.length || 0) > 0 || (generatedUrls.length > 0) );
+    const ok = !!sanitizePhone(phone || "") && !!orderPdfUrl;
 
     if (ok) {
       alreadySentRef.current = true;
       void sendTicketsViaWhatsApp();
     }
-  }, [ticketIds, generatedUrls, phone]);
+  }, [orderPdfUrl, phone]);
 
-  // URLs de PDF a mostrar (si el backend devuelve urls, se usan; si no, se construyen)
+  // URLs de PDF a mostrar (array pero sólo con 1 URL)
   const pdfUrls = useMemo<string[]>(() => {
-    if (generatedUrls.length) return generatedUrls;
-    return (ticketIds || []).map(buildTicketPdfUrl);
-  }, [generatedUrls, ticketIds]);
+    if (orderPdfUrl) return [orderPdfUrl];
+    if (orderId) return [buildOrderPdfUrl(orderId)]; // fallback
+    return [];
+  }, [orderPdfUrl, orderId]);
 
+  const singlePdfUrl = pdfUrls[0] || "";
+
+  // Mensaje de WhatsApp: UN SOLO LINK (PDF combinado)
   const messageText = useMemo<string>(() => {
     const header = `¡Hola! Aquí están tus boletos de NardeliTicket 🎟️`;
     const folio = orderId ? `\nFolio / Orden: #${orderId}` : "";
-    const links =
-      pdfUrls.length > 0
-        ? `\n\nEnlaces de boletos (PDF):\n${pdfUrls.join("\n")}`
-        : "";
+    const link = singlePdfUrl ? `\n\nTu boleto (PDF):\n${singlePdfUrl}` : "";
     const footer = `\n\n¡Gracias por tu compra!`;
-    return `${header}${folio}${links}${footer}`;
-  }, [orderId, pdfUrls]);
+    return `${header}${folio}${link}${footer}`;
+  }, [orderId, singlePdfUrl]);
 
   const handleSendWhatsApp = (): void => {
     const url = buildWaUrl(messageText, phone);
@@ -185,21 +225,21 @@ export default function CheckoutSuccess() {
 
   const handleCopyLinks = async (): Promise<void> => {
     try {
-      if (!pdfUrls.length) return;
-      await navigator.clipboard.writeText(pdfUrls.join("\n"));
-      alert("Link(s) copiado(s) al portapapeles ✅");
+      if (!singlePdfUrl) return;
+      await navigator.clipboard.writeText(singlePdfUrl);
+      alert("Link copiado al portapapeles ✅");
     } catch {
       alert("No se pudo copiar. Abre el PDF y copia desde ahí.");
     }
   };
 
   const handleOpenFirstPdf = (): void => {
-    if (pdfUrls.length) {
-      window.open(pdfUrls[0], "_blank", "noopener,noreferrer");
+    if (singlePdfUrl) {
+      window.open(singlePdfUrl, "_blank", "noopener,noreferrer");
     }
   };
 
-  // WhatsApp vía backend
+  // WhatsApp vía backend (usa ticketIds)
   async function sendTicketsViaWhatsApp(): Promise<void> {
     try {
       setSendingWa(true);
@@ -240,18 +280,28 @@ export default function CheckoutSuccess() {
     setErrorGen(null);
     try {
       const { data } = await api.post(`/checkout/orders/${orderId}/tickets/generate`);
-      const urls: string[] = Array.isArray(data?.files)
-        ? data.files.map((f: any) => f.url).filter(Boolean)
-        : [];
+
+      const urls: string[] = [];
+      if (data?.file?.url) {
+        urls.push(data.file.url);
+        setOrderPdfUrl(data.file.url);
+      } else {
+        const fallback = buildOrderPdfUrl(orderId);
+        urls.push(fallback);
+        setOrderPdfUrl(fallback);
+      }
+
       const ids: string[] = Array.isArray(data?.files)
         ? data.files.map((f: any) => f.ticketId).filter(Boolean)
         : [];
-
-      if (urls.length) setGeneratedUrls(urls);
       if (ids.length) setTicketIds(ids);
 
+      if (urls.length) setGeneratedUrls(urls);
+
       if (!urls.length && !ids.length) {
-        setErrorGen("No se generaron PDFs. Verifica que la orden esté pagada y tenga asientos vendidos.");
+        setErrorGen(
+          "No se generaron PDFs. Verifica que la orden esté pagada y tenga asientos vendidos."
+        );
       }
     } catch (e: any) {
       setErrorGen(e?.response?.data?.message || "No se pudo generar los PDF(s).");
@@ -268,6 +318,24 @@ export default function CheckoutSuccess() {
         <div style={styles.icon}>✅</div>
         <h1 style={styles.title}>¡Pago confirmado!</h1>
 
+        {/* Info principal */}
+        <p style={styles.subtitle}>
+          Tu compra se realizó con éxito. {orderId ? `Folio: #${orderId}` : ""}
+        </p>
+        <p style={{ marginTop: 4, color: "#4b5563", fontSize: 14 }}>
+          Método de pago:{" "}
+          <strong>
+            {paymentMethod === "cash"
+              ? "Pago en efectivo en taquilla"
+              : "Tarjeta / pago en línea"}
+          </strong>
+          {paymentMethod === "cash" && buyerName && (
+            <>
+              {" · "}Cliente: <strong>{buyerName}</strong>
+            </>
+          )}
+        </p>
+
         {sendingWa && <p>Enviando tus boletos por WhatsApp…</p>}
         {sentOkWa === true && (
           <p style={{ color: "#16a34a", marginTop: 8 }}>
@@ -276,27 +344,28 @@ export default function CheckoutSuccess() {
         )}
         {sentOkWa === false && (
           <div style={{ ...styles.alert, marginTop: 8 }}>
-            ❌ No se pudieron enviar por WhatsApp.<br />
-            <span style={{ whiteSpace: "pre-wrap" }}>{sendErrWa}</span><br />
-            <button onClick={sendTicketsViaWhatsApp} style={{ ...styles.secondaryBtn, marginTop: 8 }}>
+            ❌ No se pudieron enviar por WhatsApp.
+            <br />
+            <span style={{ whiteSpace: "pre-wrap" }}>{sendErrWa}</span>
+            <br />
+            <button
+              onClick={sendTicketsViaWhatsApp}
+              style={{ ...styles.secondaryBtn, marginTop: 8 }}
+            >
               Reintentar envío
             </button>
           </div>
         )}
 
-        <p style={styles.subtitle}>
-          Tu compra se realizó con éxito. {orderId ? `Folio: #${orderId}` : ""}
-        </p>
-
         {!hasData && (
           <div style={styles.alert}>
-            No se recibieron <b>ticketIds</b> ni <b>orderId</b>. Regresa al inicio o intenta nuevamente.
+            No se recibieron <b>ticketIds</b> ni <b>orderId</b>. Regresa al inicio o
+            intenta nuevamente.
           </div>
         )}
 
         {/* Acciones principales */}
         <div style={styles.actions}>
-          {/* Generar PDFs */}
           <button
             onClick={handleGeneratePdfs}
             style={styles.secondaryBtn}
@@ -309,16 +378,24 @@ export default function CheckoutSuccess() {
           <button
             onClick={handleSendWhatsApp}
             style={styles.primaryBtn}
-            disabled={sendingWa || !isValidPhone(phone) || (!pdfUrls.length && !ticketIds?.length)}
+            disabled={sendingWa || !isValidPhone(phone) || !singlePdfUrl}
           >
             {sendingWa ? "Enviando por WhatsApp..." : "Enviar boletos por WhatsApp"}
           </button>
 
-          <button onClick={handleOpenFirstPdf} style={styles.secondaryBtn} disabled={!pdfUrls.length}>
-            Abrir primer PDF
+          <button
+            onClick={handleOpenFirstPdf}
+            style={styles.secondaryBtn}
+            disabled={!singlePdfUrl}
+          >
+            Abrir PDF
           </button>
-          <button onClick={handleCopyLinks} style={styles.secondaryBtn} disabled={!pdfUrls.length}>
-            Copiar links
+          <button
+            onClick={handleCopyLinks}
+            style={styles.secondaryBtn}
+            disabled={!singlePdfUrl}
+          >
+            Copiar link
           </button>
         </div>
 
@@ -341,53 +418,69 @@ export default function CheckoutSuccess() {
             />
           </div>
           <small style={styles.hint}>
-            Ingresa el número con lada (ej. México: 52). Se enviará un mensaje con los enlaces directos a los PDF.
+            Ingresa el número con lada (ej. México: 52). Se enviará un mensaje con
+            el enlace directo al PDF.
           </small>
         </div>
-{/* Lista de PDFs (con vista previa) */}
-{!!pdfUrls.length && (
-  <div style={{ marginTop: 16 }}>
-    <div style={{ fontWeight: 600, marginBottom: 6, textAlign: "center" }}>
-      Boletos generados:
-    </div>
 
-    {/* usa layout centrado si hay 1 solo pdf */}
-    <div style={pdfUrls.length === 1 ? styles.pdfGridSingle : styles.pdfGrid}>
-      {pdfUrls.map((u) => (
-        <div key={u} style={pdfUrls.length === 1 ? styles.pdfCardLg : styles.pdfCard}>
-          <object
-            data={`${u}#view=FitH&toolbar=0&navpanes=0`}
-            type="application/pdf"
-            width="100%"
-            height="260"
-          >
-            <div style={{ padding: 12, fontSize: 14, textAlign: "center" }}>
-              No se pudo previsualizar el PDF.<br/>
-              <a href={u} target="_blank" rel="noreferrer">Abrir en nueva pestaña</a>
+        {/* Lista de PDFs (con vista previa) */}
+        {!!singlePdfUrl && (
+          <div style={{ marginTop: 16 }}>
+            <div
+              style={{ fontWeight: 600, marginBottom: 6, textAlign: "center" }}
+            >
+              Boleto(s) generado(s):
             </div>
-          </object>
 
-          <div style={styles.pdfActions}>
-            <a href={u} target="_blank" rel="noreferrer" style={styles.secondaryBtnSmall}>
-              Abrir
-            </a>
-            <a href={u} download style={styles.primaryLinkBtn}>
-              Descargar
-            </a>
+            <div style={styles.pdfGridSingle}>
+              <div style={styles.pdfCardLg}>
+                <object
+                  data={`${singlePdfUrl}#view=FitH&toolbar=0&navpanes=0`}
+                  type="application/pdf"
+                  width="100%"
+                  height="260"
+                >
+                  <div
+                    style={{ padding: 12, fontSize: 14, textAlign: "center" }}
+                  >
+                    No se pudo previsualizar el PDF.
+                    <br />
+                    <a href={singlePdfUrl} target="_blank" rel="noreferrer">
+                      Abrir en nueva pestaña
+                    </a>
+                  </div>
+                </object>
+
+                <div style={styles.pdfActions}>
+                  <a
+                    href={singlePdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={styles.secondaryBtnSmall}
+                  >
+                    Abrir
+                  </a>
+                  <a
+                    href={singlePdfUrl}
+                    download
+                    style={styles.primaryLinkBtn}
+                  >
+                    Descargar
+                  </a>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-
-
+        )}
 
         <div style={styles.footerBox}>
           <p style={styles.footerText}>
-            Si no te llega el mensaje, puedes copiar los enlaces o abrir el PDF directamente.
+            Si no te llega el mensaje, puedes copiar el enlace o abrir el PDF
+            directamente.
           </p>
-          <Link to="/" style={styles.linkHome}>Volver al inicio</Link>
+          <Link to="/" style={styles.linkHome}>
+            Volver al inicio
+          </Link>
         </div>
       </div>
     </div>
@@ -467,73 +560,52 @@ const styles: Record<string, React.CSSProperties> = {
     marginTop: 12,
   },
   linkHome: { textDecoration: "none", color: "#2563eb", fontWeight: 600 },
- 
-pdfGrid: {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-  gap: 12,
-},
 
-// centrado para 1 solo PDF
-pdfGridSingle: {
-  display: "grid",
-  gridTemplateColumns: "minmax(280px, 420px)", // ancho deseado
-  justifyContent: "center",                     // ← centra la columna
-  gap: 12,
-},
+  pdfGridSingle: {
+    display: "grid",
+    gridTemplateColumns: "minmax(280px, 420px)",
+    justifyContent: "center",
+    gap: 12,
+  },
 
-pdfCard: {
-  border: "1px solid #e5e7eb",
-  borderRadius: 12,
-  overflow: "hidden",
-  background: "#fff",
-  boxShadow: "0 4px 14px rgba(0,0,0,.06)",
-  display: "flex",
-  flexDirection: "column",
-},
+  pdfCardLg: {
+    border: "1px solid #e5e7eb",
+    borderRadius: 12,
+    overflow: "hidden",
+    background: "#fff",
+    boxShadow: "0 6px 18px rgba(0,0,0,.08)",
+    display: "flex",
+    flexDirection: "column",
+    width: "100%",
+  },
 
-// un poco más ancha/alta cuando es única
-pdfCardLg: {
-  border: "1px solid #e5e7eb",
-  borderRadius: 12,
-  overflow: "hidden",
-  background: "#fff",
-  boxShadow: "0 6px 18px rgba(0,0,0,.08)",
-  display: "flex",
-  flexDirection: "column",
-  width: "100%",
-},
+  pdfActions: {
+    display: "flex",
+    gap: 8,
+    padding: 10,
+    borderTop: "1px solid #eef2f7",
+    justifyContent: "space-between",
+  },
 
-pdfActions: {
-  display: "flex",
-  gap: 8,
-  padding: 10,
-  borderTop: "1px solid #eef2f7",
-  justifyContent: "space-between",
-},
+  secondaryBtnSmall: {
+    display: "inline-block",
+    padding: "8px 10px",
+    borderRadius: 10,
+    background: "#f3f4f6",
+    color: "#111827",
+    fontWeight: 600,
+    border: "1px solid #e5e7eb",
+    textDecoration: "none",
+  },
 
-secondaryBtnSmall: {
-  display: "inline-block",
-  padding: "8px 10px",
-  borderRadius: 10,
-  background: "#f3f4f6",
-  color: "#111827",
-  fontWeight: 600,
-  border: "1px solid #e5e7eb",
-  textDecoration: "none",
-},
-
-primaryLinkBtn: {
-  display: "inline-block",
-  padding: "8px 10px",
-  borderRadius: 10,
-  background: "#2563eb",
-  color: "#fff",
-  fontWeight: 700,
-  border: "1px solid #1e40af",
-  textDecoration: "none",
-},
-
-
-
+  primaryLinkBtn: {
+    display: "inline-block",
+    padding: "8px 10px",
+    borderRadius: 10,
+    background: "#2563eb",
+    color: "#fff",
+    fontWeight: 700,
+    border: "1px solid #1e40af",
+    textDecoration: "none",
+  },
 };

@@ -5,7 +5,71 @@ import Order from "../models/Order";                      // default export (seg
 import { Event } from "../models/Event";                  // named export
 import { User } from "../models/User";                    // named export
 
+// 👇 NUEVOS IMPORTS PARA SUBIDA DE IMÁGENES
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
 const router = Router();
+
+/* ===========================
+   Configuración subida imagen
+   =========================== */
+
+// ⬅️ ¡OJO! __dirname aquí = backend/src/routes
+// Subimos 2 niveles para llegar a backend/, luego uploads/events
+const uploadDir = path.join(__dirname, "..", "..", "uploads", "events");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || ".jpg";
+    const base = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, base + ext);
+  },
+});
+
+const upload = multer({
+  storage,
+  fileFilter: ((req, file, cb) => {
+    if (!file.mimetype.startsWith("image/")) {
+      cb(null, false);
+      return;
+    }
+    cb(null, true);
+  }) as multer.Options["fileFilter"],
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+  },
+});
+
+/**
+ * POST /api/admin/upload-event-image
+ * body: FormData con field "file"
+ * resp: { url: string }
+ */
+router.post("/upload-event-image", upload.single("file"), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No se recibió archivo." });
+    }
+
+    // ⬅️ IMPORTANTE: usar SIEMPRE el host del backend
+    const baseUrl = `${req.protocol}://${req.get("host")}`; // http://localhost:4000
+
+    const url = `${baseUrl}/uploads/events/${req.file.filename}`;
+
+    return res.json({ url });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Error al subir imagen." });
+  }
+});
 
 /** Tipos mínimos para trabajar con .lean() */
 type OrderItemLean = {
@@ -35,7 +99,15 @@ type OrderLean = {
   items: OrderItemLean[];
   tickets?: TicketLean[];
   totals: { subtotal: number; fees: number; total: number; seatCount: number };
-  status: "pending" | "requires_payment" | "pending_payment" | "paid" | "canceled" | "expired" | "failed" | string;
+  status:
+    | "pending"
+    | "requires_payment"
+    | "pending_payment"
+    | "paid"
+    | "canceled"
+    | "expired"
+    | "failed"
+    | string;
   method?: "stripe" | "cash" | "other" | string;
   createdAt?: Date;
   paidAt?: Date;

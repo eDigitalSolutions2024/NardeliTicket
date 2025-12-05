@@ -34,6 +34,24 @@ type TicketItem = {
   checkedInAt?: Date;
 };
 
+// 🔹 NUEVO: tipos para método de pago / efectivo
+type PaymentMethod = "card" | "cash";
+
+type CashPaymentInfo = {
+  amountGiven: number;      // cuánto dio el cliente
+  change: number;           // cambio entregado
+  registeredAt: Date;       // cuándo se registró
+  cashierUserId?: string;   // opcional: quién lo cobró
+};
+
+// encima de export interface IOrder...
+type BuyerInfo = {
+  name: string;
+  phone?: string;
+  email?: string;
+};
+
+
 export interface IOrder extends Document {
   currency: "MXN";
   totalsCents: OrderTotalsCents;
@@ -51,25 +69,32 @@ export interface IOrder extends Document {
   pricingVersion?: number;
   idempotencyKey?: string;
   tickets?: TicketItem[];
-
+  buyer?: BuyerInfo;    
 
   totals: { subtotal: number; fees: number; total: number; seatCount: number };
-  status: "pending" | "requires_payment" | "paid" | "canceled" | "expired";
-  stripe?: { checkoutSessionId?: string; 
-    paymentIntentId?: string };
+  status: "pending" | "requires_payment" | "paid" | "canceled" | "expired" | "failed" | "pending_payment";
+
+  // 🔹 NUEVO
+  paymentMethod: PaymentMethod;
+  cashPayment?: CashPaymentInfo;
+
+  stripe?: {
+    checkoutSessionId?: string;
+    paymentIntentId?: string;
     chargeId?: string;
-    paymenthMethodBrand?: string;
-    paymenthMethodLast4?: string;
+    paymentMethodBrand?: string;
+    paymentMethodLast4?: string;
     receiptUrl?: string;
-};
+  };
+}
 
 const TotalsCentsSchema = new Schema<OrderTotalsCents>(
   {
     subtotal: { type: Number, default: 0 },
-    fees: { type: Number, default: 0 },
-    tax: { type: Number, default: 0 },
+    fees:     { type: Number, default: 0 },
+    tax:      { type: Number, default: 0 },
     discount: { type: Number, default: 0 },
-    total: { type: Number, default: 0 },
+    total:    { type: Number, default: 0 },
   },
   { _id: false }
 );
@@ -85,14 +110,14 @@ const StatusTimelineSchema = new Schema<OrderStatusTimeline>(
 
 const TicketSchema = new Schema<TicketItem>(
   {
-    ticketId:     { type: String, required: true },
-    seatId:       { type: String, required: true },
-    tableId:      { type: String, required: true },
-    zoneId:       { type: String, required: true },
-    qrUrl:        { type: String },
-    status:       { type: String, enum: ["issued","checked_in","void"], default: "issued" },
-    issuedAt:     { type: Date, required: true },
-    checkedInAt:  { type: Date },
+    ticketId:    { type: String, required: true },
+    seatId:      { type: String, required: true },
+    tableId:     { type: String, required: true },
+    zoneId:      { type: String, required: true },
+    qrUrl:       { type: String },
+    status:      { type: String, enum: ["issued","checked_in","void"], default: "issued" },
+    issuedAt:    { type: Date, required: true },
+    checkedInAt: { type: Date },
   },
   { _id: false }
 );
@@ -107,32 +132,66 @@ const ItemSchema = new Schema<OrderItem>(
   { _id: false }
 );
 
+// 🔹 NUEVO: sub-schema para pago en efectivo
+const CashPaymentSchema = new Schema<CashPaymentInfo>(
+  {
+    amountGiven:   { type: Number, required: true },
+    change:        { type: Number, required: true },
+    registeredAt:  { type: Date,   required: true },
+    cashierUserId: { type: String },
+  },
+  { _id: false }
+);
+
+const BuyerSchema = new Schema<BuyerInfo>(
+  {
+    name:  { type: String, required: true },
+    phone: { type: String },
+    email: { type: String },
+  },
+  { _id: false }
+);
+
 const OrderSchema = new Schema<IOrder>(
   {
     currency: { type: String, default: "MXN" },
-    userId: { type: String, required: true }, // del token
-    eventId: { type: String, required: true },
+    userId:   { type: String, required: true }, // del token
+    eventId:  { type: String, required: true },
+
     totalsCents: { type: TotalsCentsSchema, default: () => ({}) },
     sessionDate: Date,
-    items: [ItemSchema],
+    items:       [ItemSchema],
+    
+    buyer: { type: BuyerSchema },  
     totals: {
       subtotal: Number,
-      fees: Number,
-      total: Number,
+      fees:     Number,
+      total:    Number,
       seatCount: Number,
     },
+
     status: {
       type: String,
       enum: ["pending", "requires_payment", "paid", "canceled", "expired","failed","pending_payment"],
       default: "pending",
     },
 
+    // 🔹 NUEVO: método de pago
+    paymentMethod: {
+      type: String,
+      enum: ["card", "cash"],
+      default: "card",
+    },
+
+    // 🔹 NUEVO: info de efectivo (solo se llena cuando es cash)
+    cashPayment: { type: CashPaymentSchema },
+
     idempotencyKey: { type: String, index: true },
-    expiresAt: { type: Date },
+    expiresAt:      { type: Date },
 
     statusTimeline: { type: [StatusTimelineSchema], default: [] },
 
-    paidAt: { type: Date },
+    paidAt:     { type: Date },
     canceledAt: { type: Date },
     refundedAt: { type: Date },
 
@@ -140,16 +199,14 @@ const OrderSchema = new Schema<IOrder>(
 
     tickets: { type: [TicketSchema], default: [] },
 
-
     stripe: {
       checkoutSessionId: String,
-      paymentIntentId: String,
-      chargeId: String,
+      paymentIntentId:   String,
+      chargeId:          String,
       paymentMethodBrand: String,
       paymentMethodLast4: String,
-      receiptUrl: String,
+      receiptUrl:         String,
     },
-    
   },
   { timestamps: true }
 );

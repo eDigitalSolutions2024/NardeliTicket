@@ -7,7 +7,12 @@ import Order from "../models/Order";
 import SeatHold from "../models/SeatHold";
 import { stripe } from "../utils/stripe";
 import { Event } from "../models/Event";
-import { ensureTicketPdf, ticketFileName } from "../utils/tickets";
+import {
+  ensureTicketPdf,
+  ticketFileName,
+  ensureMergedTicketsPdf,
+  mergedTicketFileName,
+} from "../utils/tickets";
 
 // ---------- Utilidades de pricing (centavos) ----------
 const SERVICE_FEE_PCT = 5;
@@ -65,11 +70,14 @@ export const preflightCheckout = async (req: Request & { user?: any }, res: Resp
   try {
     const { eventId, items } = req.body ?? {};
     if (!eventId || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "bad_request", message: "eventId e items son requeridos" });
+      return res
+        .status(400)
+        .json({ error: "bad_request", message: "eventId e items son requeridos" });
     }
 
     const eventDoc = await Event.findById(eventId).lean();
-    if (!eventDoc) return res.status(404).json({ error: "not_found", message: "Evento no existe" });
+    if (!eventDoc)
+      return res.status(404).json({ error: "not_found", message: "Evento no existe" });
 
     // TODO (opcional): validar que asientos no estén vendidos / retenidos por otro usuario
 
@@ -93,14 +101,27 @@ export const preflightCheckout = async (req: Request & { user?: any }, res: Resp
 /** POST /api/checkout */
 export const createCheckout = async (req: Request & { user?: any }, res: Response) => {
   try {
-    const { eventId, items, totals, sessionDate, pricing: pricingFromClient } = req.body;
+    const {
+      eventId,
+      items,
+      totals,
+      sessionDate,
+      pricing: pricingFromClient,
+      paymentMethod = "card",   // 🔹 viene del front
+      cashPayment,              // 🔹 { amountGiven, change } cuando es efectivo
+      cashCustomer,             // 🔹 { name, phone?, email? } cuando es efectivo
+      holdGroupId,
+    } = req.body;
 
     if (!eventId || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "bad_request", message: "eventId e items son requeridos" });
+      return res
+        .status(400)
+        .json({ error: "bad_request", message: "eventId e items son requeridos" });
     }
 
     const eventDoc = await Event.findById(eventId).lean();
-    if (!eventDoc) return res.status(404).json({ error: "not_found", message: "Evento no existe" });
+    if (!eventDoc)
+      return res.status(404).json({ error: "not_found", message: "Evento no existe" });
 
     // Recalcula en servidor si no recibimos pricing del preflight (backward compatible)
     const pricing =
@@ -110,8 +131,27 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
 
     const userId = req.user?.id || req.user?._id || req.user?.email || "anon";
 
-    // Orden en pending_payment y totales en centavos
-    const order = await Order.create({
+    // 🔹 Roles para limitar pago en efectivo solo a admin/taquilla
+    const roles: string[] = Array.isArray(req.user?.roles)
+      ? req.user.roles
+      : req.user?.role
+      ? [req.user.role]
+      : [];
+
+    const isAdmin = roles.includes("admin") || roles.includes("taquilla") || roles.includes("staff");
+
+    // Pago en efectivo SOLO para cuentas internas (admin/taquilla)
+    if (paymentMethod === "cash" && !isAdmin) {
+      return res.status(403).json({
+        error: "forbidden",
+        message: "El pago en efectivo solo puede ser registrado por cuentas de taquilla/admin.",
+      });
+    }
+
+    const now = new Date();
+
+    // Datos base comunes para cualquier método de pago
+    const baseOrderData: any = {
       userId,
       eventId,
       sessionDate,
@@ -125,91 +165,176 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
         discount: pricing.discountCents,
         total: pricing.totalCents,
       },
-      status: "pending_payment",
-      statusTimeline: [{ status: "pending_payment", at: new Date() }],
-    });
+      paymentMethod, // 👈 lo agregamos al modelo
+    };
 
-    // ⚙️ Id seguro como string para evitar TS "unknown" con Mongoose
-    const orderId: string = String(order._id as unknown as Types.ObjectId);
-
-    // Agrupar por zona para líneas de "entradas"
-    const zoneAgg = new Map<string, { qty: number; unit_amount: number; tableNames: Set<string> }>();
-    for (const it of items) {
-      const qty = Array.isArray(it.seatIds) ? it.seatIds.length : 0;
-      if (!qty) continue;
-
-      const zoneKey = String(it.zoneId).toUpperCase(); // "VIP" | "ORO"
-      const priceCents = priceCentsForItem(eventDoc, it); // <-- usa el helper con fallback
-
-      const current = zoneAgg.get(zoneKey) || { qty: 0, unit_amount: priceCents, tableNames: new Set<string>() };
-      current.qty += qty;
-      current.unit_amount = priceCents; // asegura el unit_amount
-      current.tableNames.add(String(it.tableId));
-      zoneAgg.set(zoneKey, current);
-    }
-
-    const line_items: any[] = [];
-
-    // 1) Entradas por zona
-    for (const [zoneKey, info] of zoneAgg) {
-      const tables = Array.from(info.tableNames).join(", ");
-      line_items.push({
-        quantity: info.qty,
-        price_data: {
-          currency: "mxn",
-          unit_amount: info.unit_amount, // precio por asiento (centavos)
-          product_data: {
-            name: `Entradas • ${zoneKey} (${tables})`,
-            metadata: { eventId, zoneId: zoneKey },
-          },
-        },
+    // ----------------------------------------------------------------
+    // CASO 1: TARJETA / STRIPE
+    // ----------------------------------------------------------------
+    if (paymentMethod === "card") {
+      const order = await Order.create({
+        ...baseOrderData,
+        status: "pending_payment",
+        statusTimeline: [{ status: "pending_payment", at: now }],
       });
-    }
 
-    // 2) Tarifa de servicio como línea separada
-    if (pricing.feesCents > 0) {
-      line_items.push({
-        quantity: 1,
-        price_data: {
-          currency: "mxn",
-          unit_amount: pricing.feesCents,
-          product_data: {
-            name: `Tarifa de servicio (${pricing.servicePct ?? 5}%)`,
-            metadata: { kind: "service_fee", eventId },
+      const orderId: string = String(order._id as unknown as Types.ObjectId);
+
+      // Agrupar por zona para líneas de "entradas"
+      const zoneAgg = new Map<
+        string,
+        { qty: number; unit_amount: number; tableNames: Set<string> }
+      >();
+      for (const it of items) {
+        const qty = Array.isArray(it.seatIds) ? it.seatIds.length : 0;
+        if (!qty) continue;
+
+        const zoneKey = String(it.zoneId).toUpperCase(); // "VIP" | "ORO"
+        const priceCents = priceCentsForItem(eventDoc, it); // <-- usa el helper con fallback
+
+        const current =
+          zoneAgg.get(zoneKey) || {
+            qty: 0,
+            unit_amount: priceCents,
+            tableNames: new Set<string>(),
+          };
+        current.qty += qty;
+        current.unit_amount = priceCents; // asegura el unit_amount
+        current.tableNames.add(String(it.tableId));
+        zoneAgg.set(zoneKey, current);
+      }
+
+      const line_items: any[] = [];
+
+      // 1) Entradas por zona
+      for (const [zoneKey, info] of zoneAgg) {
+        const tables = Array.from(info.tableNames).join(", ");
+        line_items.push({
+          quantity: info.qty,
+          price_data: {
+            currency: "mxn",
+            unit_amount: info.unit_amount, // precio por asiento (centavos)
+            product_data: {
+              name: `Entradas • ${zoneKey} (${tables})`,
+              metadata: { eventId, zoneId: zoneKey },
+            },
           },
-        },
+        });
+      }
+
+      // 2) Tarifa de servicio como línea separada
+      if (pricing.feesCents > 0) {
+        line_items.push({
+          quantity: 1,
+          price_data: {
+            currency: "mxn",
+            unit_amount: pricing.feesCents,
+            product_data: {
+              name: `Tarifa de servicio (${pricing.servicePct ?? 5}%)`,
+              metadata: { kind: "service_fee", eventId },
+            },
+          },
+        });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        line_items,
+        metadata: { orderId, eventId },
+        success_url: `${process.env.PUBLIC_URL}/checkout/success?orderId=${orderId}`,
+        cancel_url: `${process.env.PUBLIC_URL}/checkout/cancel?order=${orderId}`,
+        // customer_email: req.user?.email,
       });
+
+      order.stripe = { checkoutSessionId: session.id };
+      await order.save();
+
+      // Crear holds (uno por asiento) - backward compatible
+      const holdDocs = items.flatMap((it: any) =>
+        (it.seatIds || []).map((s: string) => ({
+          eventId,
+          tableId: it.tableId,
+          seatId: s,
+          userId,
+          orderId,
+          status: "active",
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        }))
+      );
+      if (holdDocs.length) {
+        await SeatHold.insertMany(holdDocs, { ordered: false });
+      }
+
+      return res.json({ checkoutUrl: session.url, orderId });
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items,
-      metadata: { orderId, eventId },
-      success_url: `${process.env.PUBLIC_URL}/checkout/success?orderId=${orderId}`,
-      cancel_url: `${process.env.PUBLIC_URL}/checkout/cancel?order=${orderId}`,
-      // customer_email: req.user?.email,
-    });
+    // ----------------------------------------------------------------
+    // CASO 2: PAGO EN EFECTIVO (SOLO ADMIN / TAQUILLA)
+    // ----------------------------------------------------------------
+    if (paymentMethod === "cash") {
+      // Validar datos del cliente
+      if (!cashCustomer?.name || !cashCustomer.name.trim()) {
+        return res.status(400).json({
+          error: "bad_request",
+          message: "Para pago en efectivo es obligatorio el nombre del cliente.",
+        });
+      }
 
-    order.stripe = { checkoutSessionId: session.id };
-    await order.save();
+      const amountGivenNum = Number(cashPayment?.amountGiven ?? 0);
+      const changeNum = Number(cashPayment?.change ?? 0);
 
-    // Crear holds (uno por asiento) - backward compatible
-    const holdDocs = items.flatMap((it: any) =>
-      (it.seatIds || []).map((s: string) => ({
-        eventId,
-        tableId: it.tableId,
-        seatId: s,
-        userId,
-        orderId,
-        status: "active",
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-      }))
-    );
-    if (holdDocs.length) {
-      await SeatHold.insertMany(holdDocs, { ordered: false });
+      const order = await Order.create({
+        ...baseOrderData,
+        status: "paid",
+        paidAt: now,
+        buyer: {
+          name: cashCustomer.name.trim(),
+          phone: cashCustomer.phone?.trim() || undefined,
+          email: cashCustomer.email?.trim() || undefined,
+        },
+        statusTimeline: [
+          { status: "pending_payment", at: now, note: "Orden creada para pago en efectivo" },
+          { status: "paid", at: now, note: "Pago en efectivo registrado en taquilla" },
+        ],
+        cashPayment:
+          cashPayment && !Number.isNaN(amountGivenNum)
+            ? {
+                amountGiven: amountGivenNum,
+                change: changeNum,
+                registeredAt: now,
+                cashierUserId: userId,
+              }
+            : undefined,
+      });
+
+      const orderId: string = String(order._id as unknown as Types.ObjectId);
+
+      // Para efectivo: los asientos ya quedan "vendidos" de inmediato
+      const holdDocs = items.flatMap((it: any) =>
+        (it.seatIds || []).map((s: string) => ({
+          eventId,
+          tableId: it.tableId,
+          seatId: s,
+          userId,
+          orderId,
+          status: "sold",     // 👈 ya está pagado
+          expiresAt: null,    // no expira
+        }))
+      );
+
+      if (holdDocs.length) {
+        await SeatHold.insertMany(holdDocs, { ordered: false });
+      }
+
+      const successUrl = `${process.env.PUBLIC_URL}/checkout/success?orderId=${orderId}`;
+
+      return res.json({ ok: true, orderId, successUrl });
     }
 
-    return res.json({ checkoutUrl: session.url, orderId });
+    // Si llega algo raro
+    return res
+      .status(400)
+      .json({ error: "invalid_payment_method", message: "Método de pago inválido" });
   } catch (err: any) {
     console.error(err);
     return res.status(500).json({ error: "checkout_failed", message: err.message });
@@ -228,7 +353,9 @@ export async function streamSingleTicketPdf(req: Request, res: Response) {
     const order = await Order.findOne({ "tickets.ticketId": ticketId }).lean();
     if (!order) return res.status(404).json({ message: "Boleto no encontrado" });
 
-    const ticket = (order.tickets || []).find((t: any) => String(t.ticketId) === String(ticketId));
+    const ticket = (order.tickets || []).find(
+      (t: any) => String(t.ticketId) === String(ticketId)
+    );
     if (!ticket) return res.status(404).json({ message: "Boleto no encontrado" });
 
     // 2) Carga (opcional) del evento para encabezado
@@ -304,7 +431,10 @@ export async function streamSingleTicketPdf(req: Request, res: Response) {
 
     const qrBuf = await toQrBuf(verifyUrl);
     const qrSize = 170;
-    doc.image(qrBuf, cardX + cardW - qrSize - 12, cardY + 12, { width: qrSize, height: qrSize });
+    doc.image(qrBuf, cardX + cardW - qrSize - 12, cardY + 12, {
+      width: qrSize,
+      height: qrSize,
+    });
 
     doc
       .fillColor("#6b7280")
@@ -329,13 +459,9 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
       return res.status(400).json({ message: "La orden no está pagada" });
     }
 
-    // 1) Cargar evento para título/fecha/lugar
     const event = order.eventId ? await Event.findById(order.eventId).lean() : null;
-
-    // 2) Asientos ligados a la orden (usa el campo correcto: orderId)
     const seats = await SeatHold.find({ orderId, status: "sold" }).lean();
 
-    // 3) Tickets (de order.tickets o derivados de seats)
     const tickets =
       order.tickets && order.tickets.length
         ? order.tickets.map((t: any) => ({
@@ -352,10 +478,11 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
           }));
 
     if (!tickets.length) {
-      return res.status(400).json({ message: "No hay tickets/asientos vendidos para esta orden" });
+      return res
+        .status(400)
+        .json({ message: "No hay tickets/asientos vendidos para esta orden" });
     }
 
-    // 4) Mapa seatId -> item para extraer zona y precio
     const itemBySeat = new Map<string, any>();
     for (const it of (order as any).items || []) {
       for (const sid of it.seatIds || []) {
@@ -363,7 +490,7 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
       }
     }
 
-    // 5) Enriquecer y generar PDFs
+    // generar PDFs individuales
     for (const t of tickets) {
       const s =
         seats.find((x: any) => String(x._id) === String(t.seatId)) || ({} as any);
@@ -373,10 +500,8 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
         itemBySeat.get(String(t.seatId)) ||
         null;
 
-      // zona
       const zoneId = t.zoneId ?? it?.zoneId ?? s.zoneId ?? s.zone ?? undefined;
 
-      // precio (centavos -> pesos) usando el helper
       let pricePesos: number | undefined = undefined;
       if (event && it) {
         const cents = priceCentsForItem(event, it);
@@ -392,9 +517,9 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
         price: pricePesos,
       };
 
-      // Datos del evento listos para el PDF
       const eventName = event?.title ?? "Evento";
-      const eventDate = (order as any).sessionDate ?? event?.sessions?.[0]?.date ?? undefined;
+      const eventDate =
+        (order as any).sessionDate ?? event?.sessions?.[0]?.date ?? undefined;
       const eventPlace = [event?.venue, event?.city].filter(Boolean).join(", ");
 
       const orderForPdf = {
@@ -411,22 +536,31 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
       });
     }
 
-    // 6) Responder con URLs públicas de los PDFs en /files/tickets
-      const origin =
-        process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`;
+    // URLs
+    const origin =
+      process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`;
+    const base = `${origin}/files/tickets`;
 
-      const base = `${origin}/files/tickets`;
+    const files = tickets.map((t: any) => ({
+      ticketId: t.ticketId,
+      fileName: ticketFileName(t.ticketId),
+      url: `${base}/${ticketFileName(t.ticketId)}`,
+    }));
 
-      const files = tickets.map((t: any) => ({
-        ticketId: t.ticketId,
-        fileName: ticketFileName(t.ticketId),
-        url: `${base}/${ticketFileName(t.ticketId)}`,
-      }));
+    // PDF combinado (1 archivo por orden)
+    const ticketIds = tickets.map((t: any) => t.ticketId);
+    await ensureMergedTicketsPdf(String(order._id), ticketIds);
 
+    const merged = {
+      fileName: mergedTicketFileName(String(order._id)),
+      url: `${base}/${mergedTicketFileName(String(order._id))}`,
+    };
 
-    return res.json({ orderId, count: files.length, files });
+    return res.json({ orderId, count: files.length, files, merged });
   } catch (e: any) {
     console.error("generateOrderTicketsPdfs error:", e);
-    return res.status(500).json({ message: "No se pudieron generar los PDFs", detail: e.message });
+    return res
+      .status(500)
+      .json({ message: "No se pudieron generar los PDFs", detail: e.message });
   }
 }

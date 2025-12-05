@@ -22,16 +22,19 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.19.1",
     "morgan": "^1.10.1",
+    "multer": "^2.0.2",
     "nanoid": "^5.1.6",
+    "pdf-lib": "^1.17.1",
     "pdfkit": "^0.17.2",
     "qrcode": "^1.5.4",
-    "stripe": "^19.1.0"
+    "stripe": "^19.3.1"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
+    "@types/multer": "^2.0.0",
     "@types/node": "^24.7.0",
     "@types/pdfkit": "^0.17.3",
     "@types/qrcode": "^1.5.6",

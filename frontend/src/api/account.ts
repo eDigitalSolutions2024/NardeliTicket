@@ -1,4 +1,3 @@
-// src/api/account.ts
 import { api } from "./client";
 
 export type Me = {
@@ -8,6 +7,23 @@ export type Me = {
   role: "admin" | "user";
   phone?: string;      // opcional
   avatarUrl?: string;  // opcional
+};
+
+// 👇 NUEVO
+export type MyPurchase = {
+  orderId: string;
+  ticketId: string;
+  eventId: string;
+  eventTitle: string;
+  sessionDate?: string | null;
+  zone?: string;
+  seatLabel?: string;
+  price?: number;
+  status: string;
+  method?: string;
+  createdAt?: string | null;
+  paidAt?: string | null;
+  pdfUrl?: string | null;
 };
 
 // GET /api/account/me
@@ -26,4 +42,10 @@ export async function updateProfile(payload: { name?: string; phone?: string }):
 export async function changePassword(payload: { currentPassword: string; newPassword: string }) {
   await api.put("/account/password", payload);
   return { ok: true };
+}
+
+// 👇 NUEVO: GET /api/account/purchases
+export async function fetchMyPurchases(): Promise<MyPurchase[]> {
+  const r = await api.get("/account/purchases");
+  return (r.data.rows ?? []) as MyPurchase[];
 }

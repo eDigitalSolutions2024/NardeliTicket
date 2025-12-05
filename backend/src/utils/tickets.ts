@@ -2,7 +2,8 @@
 import fs from "fs";
 import path from "path";
 import PDFDocument from "pdfkit";
-import * as QRCode from "qrcode"; // 👈 NUEVO
+import * as QRCode from "qrcode";
+import { PDFDocument as PdfLibDocument } from "pdf-lib"; // 👈 para unir PDFs
 
 export function ticketsDir() {
   return path.join(__dirname, "..", "tickets");
@@ -12,11 +13,20 @@ export function ensureTicketsDir() {
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
+
 export function ticketFileName(ticketId: string) {
   return `ticket_${ticketId}.pdf`;
 }
 export function ticketFilePath(ticketId: string) {
   return path.join(ticketsDir(), ticketFileName(ticketId));
+}
+
+// ---- merged por orden ----
+export function mergedTicketFileName(orderId: string) {
+  return `tickets_order_${orderId}.pdf`;
+}
+export function mergedTicketFilePath(orderId: string) {
+  return path.join(ticketsDir(), mergedTicketFileName(orderId));
 }
 
 // ---------- Helpers ----------
@@ -36,6 +46,7 @@ function money(n?: number) {
   return `$${n.toFixed(2)} MXN`;
 }
 
+// ---------- PDF de UN boleto ----------
 export async function ensureTicketPdf({
   ticketId,
   order,
@@ -70,14 +81,13 @@ export async function ensureTicketPdf({
       : undefined;
 
   const logoPathFromEnv = process.env.LOGO_PATH;
-  const defaultLogoPath = path.join(__dirname, "logo-nardeli.png"); // evita acentos
+  const defaultLogoPath = path.join(__dirname, "logo-nardeli.png");
   const logoPath = fs.existsSync(logoPathFromEnv || "")
     ? (logoPathFromEnv as string)
     : fs.existsSync(defaultLogoPath)
     ? defaultLogoPath
     : null;
 
-  // 👇 Preparamos un texto/URL “dummy” para el QR (luego lo cambiamos)
   const base = process.env.PUBLIC_URL ?? "http://localhost:5173";
   const qrText = `${base}/tickets/verify?tid=${ticketId}&oid=${order?._id ?? ""}`;
   const qrBuf = await QRCode.toBuffer(qrText, {
@@ -91,7 +101,7 @@ export async function ensureTicketPdf({
     const out = fs.createWriteStream(file);
     doc.pipe(out);
 
-    // ====== Header (logo + marca) ======
+    // Header
     const headerH = 42;
     doc
       .roundedRect(18, 18, doc.page.width - 36, headerH, 8)
@@ -121,7 +131,7 @@ export async function ensureTicketPdf({
       .fontSize(10)
       .text(`Folio: #${order?._id || "—"}`, 26 + (logoW ? logoW + 6 : 0), 26 + 18);
 
-    // ====== Tarjeta de detalles ======
+    // Tarjeta
     const cardY = 18 + headerH + 10;
     const cardX = 18;
     const cardW = doc.page.width - 36;
@@ -170,13 +180,12 @@ export async function ensureTicketPdf({
       .fontSize(9)
       .text("Presenta este boleto en el acceso.", cardX + 12, cardY + cardH - 18);
 
-    // ====== QR centrado debajo del ticket ======
-    const qrSize = 120; // px aprox
+    // QR
+    const qrSize = 120;
     const qrY = cardY + cardH + 14;
     const qrX = (doc.page.width - qrSize) / 2;
     doc.image(qrBuf, qrX, qrY, { width: qrSize, height: qrSize });
 
-    // leyenda opcional
     doc
       .fillColor(GRAY)
       .fontSize(9)
@@ -185,7 +194,7 @@ export async function ensureTicketPdf({
         align: "center",
       });
 
-    // ====== Footer ======
+    // Footer
     doc
       .fillColor(GRAY)
       .fontSize(9)
@@ -200,4 +209,29 @@ export async function ensureTicketPdf({
   });
 
   return file;
+}
+
+// ---------- PDF combinado por orden ----------
+export async function ensureMergedTicketsPdf(
+  orderId: string,
+  ticketIds: string[]
+): Promise<string> {
+  ensureTicketsDir();
+  const outPath = mergedTicketFilePath(orderId);
+  if (fs.existsSync(outPath)) return outPath;
+
+  const mergedPdf = await PdfLibDocument.create();
+
+  for (const tid of ticketIds) {
+    const p = ticketFilePath(tid);
+    if (!fs.existsSync(p)) continue;
+    const bytes = fs.readFileSync(p);
+    const src = await PdfLibDocument.load(bytes);
+    const pages = await mergedPdf.copyPages(src, src.getPageIndices());
+    pages.forEach((pg) => mergedPdf.addPage(pg));
+  }
+
+  const outBytes = await mergedPdf.save();
+  fs.writeFileSync(outPath, outBytes);
+  return outPath;
 }

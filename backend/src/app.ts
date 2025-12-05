@@ -58,6 +58,12 @@ app.use(
   })
 );
 
+// Carpeta estática para las imágenes subidas
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "..", "uploads"))
+);
+
 /** 8) Healthcheck */
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
 

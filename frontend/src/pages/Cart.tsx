@@ -129,96 +129,107 @@ export default function CartPage() {
   }
 
   // 5) Acción principal: Ir a pagar (preflight -> create session)
-  async function handleCheckout(
-    method: PaymentMethod,
-    cashData?: { amountGiven: number; change: number },
-    cashCustomer?: BuyerInfo
-  ) {
-    if (!eventId || items.length === 0) return;
+async function handleCheckout(
+  method: PaymentMethod,
+  cashData?: { amountGiven: number; change: number },
+  cashCustomer?: BuyerInfo
+) {
+  if (!eventId || items.length === 0) return;
 
-    try {
-      const bodyBase: any = {
-        eventId,
-        items,
-        totals,
-        sessionDate,
-        paymentMethod: method,
-      };
+  try {
+    const bodyBase: any = {
+      eventId,
+      items,
+      totals,
+      sessionDate,
+      paymentMethod: method,
+    };
 
-      // Mandar buyer también para otros flujos si quieres
-      if (cashCustomer) {
-        bodyBase.cashCustomer = cashCustomer;
-      }
-
-      if (method === "cash" && cashData) {
-        bodyBase.cashPayment = {
-          amountGiven: cashData.amountGiven,
-          change: cashData.change,
-        };
-      }
-
-      // 1) Preflight: confirma totales en el servidor (centavos)
-      const { data: pre } = await api.post("/checkout/preflight", bodyBase);
-
-      // 2) Crear sesión de checkout / orden usando los totales confirmados
-      const { data } = await api.post("/checkout", {
-        ...bodyBase,
-        pricing: pre?.pricing,
-        holdGroupId: pre?.hold?.holdGroupId,
-      });
-
-      // Lógica según método de pago
-      if (method === "card") {
-        // Flujo normal Stripe
-        if (data?.checkoutUrl) {
-          window.location.href = data.checkoutUrl;
-          return;
-        }
-        if (data?.orderId) {
-          navigate(`/order/${data.orderId}`);
-          return;
-        }
-        alert("Checkout creado, pero no se recibió URL ni ID de orden.");
-      } else {
-        // method === "cash"
-        if (data?.orderId) {
-          const targetUrl =
-            data.successUrl || `/checkout/success?orderId=${data.orderId}&pm=cash`;
-
-          navigate(targetUrl, {
-            state: {
-              orderId: data.orderId,
-              paymentMethod: "cash",
-              phone: buyerPhone || undefined,
-              buyerName: buyerName || undefined,
-            },
-          });
-
-          // Podrías limpiar el carrito si quieres:
-          // sessionStorage.removeItem(PENDING_KEY);
-          // setItems([]);
-          return;
-        }
-        alert("Se registró el pago en efectivo, pero no se recibió ID de orden.");
-      }
-    } catch (err: any) {
-      if (err?.response?.status === 401) {
-        navigate("/auth?tab=login", { state: { redirectTo: "/cart" }, replace: true });
-        return;
-      }
-      if (err?.response?.status === 403 && paymentMethod === "cash") {
-        alert("El pago en efectivo solo está permitido para cuentas internas (taquilla/admin).");
-        return;
-      }
-      if (err?.response?.status === 409) {
-        alert("Algunos asientos ya no están disponibles. Vuelve a seleccionar.");
-        navigate(`/event/${eventId}/seleccion`);
-        return;
-      }
-      console.error(err);
-      alert("No se pudo iniciar el checkout.");
+    // Mandar buyer también para otros flujos si quieres
+    if (cashCustomer) {
+      bodyBase.cashCustomer = cashCustomer;
     }
+
+    if (method === "cash" && cashData) {
+      bodyBase.cashPayment = {
+        amountGiven: cashData.amountGiven,
+        change: cashData.change,
+      };
+    }
+
+    // 1) Preflight: confirma totales en el servidor (centavos)
+    const { data: pre } = await api.post("/checkout/preflight", bodyBase);
+
+    // 2) Crear sesión de checkout / orden usando los totales confirmados
+    const { data } = await api.post("/checkout", {
+      ...bodyBase,
+      pricing: pre?.pricing,
+      holdGroupId: pre?.hold?.holdGroupId,
+    });
+
+    // --------------------------
+    //       TARJETA / STRIPE
+    // --------------------------
+    if (method === "card") {
+      if (data?.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+      if (data?.orderId) {
+        navigate(`/order/${data.orderId}`);
+        return;
+      }
+      alert("Checkout creado, pero no se recibió URL ni ID de orden.");
+      return;
+    }
+
+    // --------------------------
+    //       PAGO EN EFECTIVO
+    // --------------------------
+    if (method === "cash") {
+      if (data?.orderId) {
+        const orderId = data.orderId as string;
+
+        // SIEMPRE usamos la ruta interna del front
+        const targetUrl = `/checkout/success?orderId=${orderId}&pm=cash`;
+
+        navigate(targetUrl, {
+          state: {
+            orderId,
+            paymentMethod: "cash",
+            phone: buyerPhone || undefined,
+            buyerName: buyerName || undefined,
+          },
+        });
+
+        // Opcional: limpiar carrito
+        // sessionStorage.removeItem(PENDING_KEY);
+        // setItems([]);
+        return;
+      }
+      alert("Se registró el pago en efectivo, pero no se recibió ID de orden.");
+      return;
+    }
+  } catch (err: any) {
+    // 👇 aquí va el catch corregido (lo pongo completo abajo)
+    if (err?.response?.status === 401) {
+      navigate("/auth?tab=login", { state: { redirectTo: "/cart" }, replace: true });
+      return;
+    }
+    if (err?.response?.status === 403 && method === "cash") {
+      alert("El pago en efectivo solo está permitido para cuentas internas (taquilla/admin).");
+      return;
+    }
+    if (err?.response?.status === 409) {
+      alert("Algunos asientos ya no están disponibles. Vuelve a seleccionar.");
+      navigate(`/event/${eventId}/seleccion`);
+      return;
+    }
+    console.error(err);
+    alert("No se pudo iniciar el checkout.");
   }
+}
+
 
   // Botón principal
   function handlePayClick() {

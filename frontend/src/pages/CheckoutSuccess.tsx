@@ -41,15 +41,6 @@ function getPhoneFromStorage(): string | null {
   }
 }
 
-// 🔗 (por si algún día quisieras volver a PDFs individuales)
-// http://localhost:4000/api/checkout/tickets/<ticketId>.pdf
-/*function buildTicketPdfUrl(tid: string): string {
-  const base = API_BASE.replace(/\/+$/, "");
-  const hasApi = /\/api$/.test(base);
-  const root = hasApi ? base : `${base}/api`;
-  return `${root}/checkout/tickets/${tid}.pdf`;
-}*/
-
 // 🔗 PDF combinado por orden: /files/tickets/tickets_order_<orderId>.pdf
 function buildOrderPdfUrl(orderId: string): string {
   const base = API_BASE.replace(/\/+$/, "");
@@ -62,10 +53,16 @@ export default function CheckoutSuccess() {
   const state = (location.state as LocationState) || {};
   const [searchParams] = useSearchParams();
 
+  const sessionId = searchParams.get("session_id");
+  const pmQuery = searchParams.get("pm");
+
   //const [generatedUrls, setGeneratedUrls] = useState<string[]>([]);
   const [orderPdfUrl, setOrderPdfUrl] = useState<string | null>(null);
   const [loadingGen, setLoadingGen] = useState(false);
   const [errorGen, setErrorGen] = useState<string | null>(null);
+
+  // Para no disparar el auto-generate más de una vez por orden
+  const [autoRequestedFor, setAutoRequestedFor] = useState<string | null>(null);
 
   // WhatsApp
   const [sendingWa, setSendingWa] = useState(false);
@@ -82,9 +79,20 @@ export default function CheckoutSuccess() {
     searchParams.get("reservaId") ||
     undefined;
 
-  // método de pago y nombre del cliente (cash)
+  // método de pago y nombre del cliente (cash vs card)
+  // 1) Si viene en state, manda.
+  // 2) Si viene en query (?pm=cash|card), manda.
+  // 3) Si NO hay session_id de Stripe, asumimos efectivo (cash).
+  // 4) Si hay session_id, asumimos tarjeta.
   const paymentMethod: "card" | "cash" =
-    state.paymentMethod || (searchParams.get("pm") === "cash" ? "cash" : "card");
+    state.paymentMethod ||
+    (pmQuery === "cash"
+      ? "cash"
+      : pmQuery === "card"
+      ? "card"
+      : !sessionId
+      ? "cash"
+      : "card");
 
   const buyerName: string = state.buyerName || searchParams.get("buyerName") || "";
 
@@ -148,16 +156,20 @@ export default function CheckoutSuccess() {
   //
   // - Efectivo: en cuanto hay orderId (orden ya viene pagada).
   // - Tarjeta: solo cuando ya hay ticketIds (webhook terminó).
-  const triedAutoGenRef = useRef(false);
   useEffect(() => {
-    if (triedAutoGenRef.current) return;
     if (!orderId) return;
     if (orderPdfUrl) return;
 
-    const needsTicketsFirst = paymentMethod === "card";
-    if (needsTicketsFirst && (!ticketIds || ticketIds.length === 0)) return;
+    // Evitar llamar varias veces para la misma orden
+    if (autoRequestedFor === orderId) return;
 
-    triedAutoGenRef.current = true;
+    const needsTicketsFirst = paymentMethod === "card";
+    if (needsTicketsFirst && (!ticketIds || ticketIds.length === 0)) {
+      // Para tarjeta, esperamos a que el webhook haya creado los tickets
+      return;
+    }
+
+    setAutoRequestedFor(orderId);
 
     (async () => {
       try {
@@ -165,6 +177,7 @@ export default function CheckoutSuccess() {
         const { data } = await api.post(`/checkout/orders/${orderId}/tickets/generate`);
 
         const urls: string[] = [];
+
         if (data?.file?.url) {
           urls.push(data.file.url);
           setOrderPdfUrl(data.file.url);
@@ -178,8 +191,6 @@ export default function CheckoutSuccess() {
           ? data.files.map((f: any) => f.ticketId).filter(Boolean)
           : [];
         if (ids.length) setTicketIds(ids);
-
-        //if (urls.length) setGeneratedUrls(urls);
       } catch (e) {
         console.error("auto-generate PDFs error:", e);
         // no bloqueamos la vista; el usuario puede usar el botón manual
@@ -187,7 +198,7 @@ export default function CheckoutSuccess() {
         setLoadingGen(false);
       }
     })();
-  }, [orderId, ticketIds, orderPdfUrl, paymentMethod]);
+  }, [orderId, ticketIds, orderPdfUrl, paymentMethod, autoRequestedFor]);
 
   // 3) Envío automático por WhatsApp SOLO cuando hay phone y ya tenemos el PDF combinado
   useEffect(() => {

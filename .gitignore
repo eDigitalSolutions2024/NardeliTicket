@@ -75,3 +75,6 @@ backend/uploads/
 *.local
 .sass-cache/
 *.map
+
+
+backend/src/tickets/

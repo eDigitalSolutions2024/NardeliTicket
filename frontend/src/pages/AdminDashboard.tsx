@@ -1063,8 +1063,7 @@ function LayoutEditorModal({
     const out: LayoutTable[] = [];
 
     // Constantes aproximadas del mapa grande
-    const TABLE_W = 190;
-    const TABLE_H = 120;
+    
     const STEP_X = 340;
     const STEP_Y = 250;
 

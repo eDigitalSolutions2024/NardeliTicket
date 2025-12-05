@@ -43,12 +43,12 @@ function getPhoneFromStorage(): string | null {
 
 // 🔗 (por si algún día quisieras volver a PDFs individuales)
 // http://localhost:4000/api/checkout/tickets/<ticketId>.pdf
-function buildTicketPdfUrl(tid: string): string {
+/*function buildTicketPdfUrl(tid: string): string {
   const base = API_BASE.replace(/\/+$/, "");
   const hasApi = /\/api$/.test(base);
   const root = hasApi ? base : `${base}/api`;
   return `${root}/checkout/tickets/${tid}.pdf`;
-}
+}*/
 
 // 🔗 PDF combinado por orden: /files/tickets/tickets_order_<orderId>.pdf
 function buildOrderPdfUrl(orderId: string): string {
@@ -62,7 +62,7 @@ export default function CheckoutSuccess() {
   const state = (location.state as LocationState) || {};
   const [searchParams] = useSearchParams();
 
-  const [generatedUrls, setGeneratedUrls] = useState<string[]>([]);
+  //const [generatedUrls, setGeneratedUrls] = useState<string[]>([]);
   const [orderPdfUrl, setOrderPdfUrl] = useState<string | null>(null);
   const [loadingGen, setLoadingGen] = useState(false);
   const [errorGen, setErrorGen] = useState<string | null>(null);
@@ -179,7 +179,7 @@ export default function CheckoutSuccess() {
           : [];
         if (ids.length) setTicketIds(ids);
 
-        if (urls.length) setGeneratedUrls(urls);
+        //if (urls.length) setGeneratedUrls(urls);
       } catch (e) {
         console.error("auto-generate PDFs error:", e);
         // no bloqueamos la vista; el usuario puede usar el botón manual
@@ -296,7 +296,7 @@ export default function CheckoutSuccess() {
         : [];
       if (ids.length) setTicketIds(ids);
 
-      if (urls.length) setGeneratedUrls(urls);
+      //if (urls.length) setGeneratedUrls(urls);
 
       if (!urls.length && !ids.length) {
         setErrorGen(

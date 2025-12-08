@@ -212,8 +212,7 @@ export default function Home() {
             )}
 
             {/* tu card tal cual */}
-            <div className="card shell card--clickable"
-                 onClick={() => (window.location.href = `/evento/${ev.id}`)}>
+            <div className="card shell card--clickable">
               <EventCard ev={ev} className="card" onClick={() => {}} />
             </div>
           </div>

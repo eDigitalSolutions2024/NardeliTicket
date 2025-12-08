@@ -1,5 +1,5 @@
 
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import type { EventItem } from "../types/Event";
 
 type Props = {
@@ -24,19 +24,20 @@ export default function EventCard({
   ev,
   onClick,
   className,
-  buttonText = "Ver evento",
   hrefBase = "/events", // cámbialo a "/evento" si tu ruta es /evento/:id
 }: Props) {
   const next = getNextDate(ev);
-  const handleClick = () => onClick?.(ev.id);
+  const navigate = useNavigate();
+  const handleClick = () => {navigate(`${hrefBase}/${ev.id}`)};
+
 
   return (
     <article
-      className={`card ${onClick ? "card--clickable" : ""} ${className ?? ""}`}
+      className={`card card--clickable ${className ?? ""}`}
       onClick={handleClick}
-      tabIndex={onClick ? 0 : -1}
+      tabIndex={0}
       onKeyDown={(e) => {
-        if (onClick && (e.key === "Enter" || e.key === " ")) {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           handleClick();
         }
@@ -55,18 +56,6 @@ export default function EventCard({
         <p className="card__price">
           {next ? `Próx.: ${next.toLocaleString("es-MX")}` : "Sin fechas próximas"}
         </p>
-
-        {/* Botón Ver evento */}
-        <div className="card__actions">
-          <Link
-            to={`${hrefBase}/${ev.id}`}
-            className="btn-primary"
-            onClick={(e) => e.stopPropagation()}
-            aria-label={`Ver evento ${ev.title}`}
-          >
-            {buttonText}
-          </Link>
-        </div>
       </div>
     </article>
   );

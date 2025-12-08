@@ -401,7 +401,7 @@
 }
 
 .card__body {
-  padding: 20px;
+  padding: 20px 18px 56px;
   position: relative;
   z-index: 1;
 }

@@ -22,7 +22,6 @@ const getNextDate = (ev: EventItem): Date | null => {
 
 export default function EventCard({
   ev,
-  onClick,
   className,
   hrefBase = "/events", // cámbialo a "/evento" si tu ruta es /evento/:id
 }: Props) {

@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+/*import React, { useMemo, useRef, useState } from "react";
 
 type SeatNode = {
   id: string;
@@ -164,7 +164,7 @@ const renderTable = (t: TableGeom) => {
 
   return (
     <g key={t.id}>
-      {/* rectángulo de la mesa */}
+      {/* rectángulo de la mesa }
       <rect
         x={t.cx - w / 2}
         y={t.cy - h / 2}
@@ -177,7 +177,7 @@ const renderTable = (t: TableGeom) => {
         strokeWidth={4}   // 👈 más grueso para que se note
       />
 
-      {/* "línea" de color encima de la mesa, bien notoria */}
+      {/* "línea" de color encima de la mesa, bien notoria }
       <line
         x1={t.cx - w / 2}
         y1={t.cy - h / 2 - 6}
@@ -188,7 +188,7 @@ const renderTable = (t: TableGeom) => {
         strokeLinecap="round"
       />
 
-      {/* etiqueta pequeña de mesa */}
+      {/* etiqueta pequeña de mesa }
       <text
         x={t.cx}
         y={t.cy + 5}
@@ -222,7 +222,7 @@ const renderTable = (t: TableGeom) => {
         </defs>
 
         <g transform={`translate(${offset.x} ${offset.y}) scale(${scale})`}>
-          {/* Escenario a la izquierda (decorativo) */}
+          {/* Escenario a la izquierda (decorativo) }
           <g transform="translate(30, 280)" filter="url(#soft)">
             <rect x="0" y="-120" width="70" height="240" fill="#111" rx="8" />
             <text
@@ -237,8 +237,8 @@ const renderTable = (t: TableGeom) => {
             </text>
           </g>
 
-          {/* Marcos de ZONA */}
-          {/* ORO */}
+          {/* Marcos de ZONA }
+          {/* ORO }
           <rect
             x="60"
             y="80"
@@ -253,7 +253,7 @@ const renderTable = (t: TableGeom) => {
             ZONA ORO — 25 mesas × 12 asientos
           </text>
 
-          {/* VIP */}
+          {/* VIP }
           <rect
             x="990"
             y="80"
@@ -268,7 +268,7 @@ const renderTable = (t: TableGeom) => {
             ZONA VIP — 15 mesas × 12 asientos
           </text>
 
-          {/* MESAS + SILLAS */}
+          {/* MESAS + SILLAS }
           {data.tables.map((table) => {
             return (
               <g key={table.id}>
@@ -323,7 +323,7 @@ const renderTable = (t: TableGeom) => {
             );
           })}
 
-          {/* Leyenda zonas VIP / ORO */}
+          {/* Leyenda zonas VIP / ORO }
           <g transform="translate(70, 720)">
             <rect
               x="0"
@@ -333,7 +333,7 @@ const renderTable = (t: TableGeom) => {
               fill="#0f1629"
               rx="10"
             />
-            {/* ORO */}
+            {/* ORO }
             <line
               x1="18"
               y1="-8"
@@ -346,7 +346,7 @@ const renderTable = (t: TableGeom) => {
               Marco dorado = Zona ORO
             </text>
 
-            {/* VIP */}
+            {/* VIP }
             <line
               x1="250"
               y1="-8"
@@ -367,3 +367,4 @@ const renderTable = (t: TableGeom) => {
     </div>
   );
 }
+*/

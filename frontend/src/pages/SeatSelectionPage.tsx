@@ -372,8 +372,7 @@ function SeatMapSVG({
   selected,
   onlyAvailable,
   onToggle,
-  onReady,
-  onPreview, // 👈 nuevo
+  onReady, // 👈 nuevo
   blockedKeys,
   disabledTables,
 }: {
@@ -416,8 +415,8 @@ const tables = useMemo<TableGeom[]>(() => buildTables(), []);
       ? "#f59e0b"
       : "#ef4444";
 
-  const zoneColor = (zone: "VIP" | "ORO") =>
-    zone === "VIP" ? "#1e62ff" : "#d4af37";
+  /*const zoneColor = (zone: "VIP" | "ORO") =>
+    zone === "VIP" ? "#1e62ff" : "#d4af37";*/
 
 const renderTableRect = (t: TableGeom) => {
   const [zone, numStr] = t.id.split("-");

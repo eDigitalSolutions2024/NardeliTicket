@@ -372,7 +372,8 @@ function SeatMapSVG({
   selected,
   onlyAvailable,
   onToggle,
-  onReady, // 👈 nuevo
+  onReady,
+  onPreview,
   blockedKeys,
   disabledTables,
 }: {
@@ -380,18 +381,22 @@ function SeatMapSVG({
   onlyAvailable: boolean;
   onToggle: (tableId: string, seatId: string) => void;
   onReady: (tables: TableGeom[]) => void;
-  onPreview: () => void; // 👈 nuevo
+  onPreview: () => void;
   blockedKeys?: Set<string>;
   disabledTables?: Set<string>;
 }) {
-const tables = useMemo<TableGeom[]>(() => buildTables(), []);
+  const tables = useMemo<TableGeom[]>(() => buildTables(), []);
 
-  // Pan/Zoom
+  // avisamos al padre
+  useEffect(() => {
+    onReady(tables);
+    console.log("SeatMapSVG -> mesas:", tables.length);
+  }, [tables, onReady]);
+
+  // --- Pan & zoom simples (como antes) ---
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const drag = useRef<null | { x: number; y: number }>(null);
-
-  useEffect(() => onReady(tables), [tables, onReady]);
 
   const onWheel = (e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
@@ -400,10 +405,15 @@ const tables = useMemo<TableGeom[]>(() => buildTables(), []);
   const onMouseDown = (e: React.MouseEvent) => {
     drag.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
   };
-  const onMouseUp = () => (drag.current = null);
+  const onMouseUp = () => {
+    drag.current = null;
+  };
   const onMouseMove = (e: React.MouseEvent) => {
     if (!drag.current) return;
-    setOffset({ x: e.clientX - drag.current.x, y: e.clientY - drag.current.y });
+    setOffset({
+      x: e.clientX - drag.current.x,
+      y: e.clientY - drag.current.y,
+    });
   };
 
   const colorBy = (state: SeatStatus | "selected") =>
@@ -415,96 +425,98 @@ const tables = useMemo<TableGeom[]>(() => buildTables(), []);
       ? "#f59e0b"
       : "#ef4444";
 
-  /*const zoneColor = (zone: "VIP" | "ORO") =>
-    zone === "VIP" ? "#1e62ff" : "#d4af37";*/
+  const renderTableRect = (t: TableGeom) => {
+    const [zone, numStr] = t.id.split("-");
+    const num = parseInt(numStr, 10);
+    const label =
+      !isNaN(num) && num >= 1 ? `${zone}-${numToLetter(num)}` : t.id;
 
-const renderTableRect = (t: TableGeom) => {
-  const [zone, numStr] = t.id.split("-");
-  const num = parseInt(numStr, 10);
-  const label =
-    !isNaN(num) && num >= 1 ? `${zone}-${numToLetter(num)}` : t.id;
+    const isVip = t.zoneId === "VIP";
+    const strokeColor = isVip ? "#1e62ff" : "#d4af37";
 
-  // color según zona
-  const strokeColor = t.zoneId === "VIP" ? "#1e62ff" : "#d4af37";
-
-  return (
-    <g key={`${t.id}-rect`}>
-      <rect
-        x={t.cx - TABLE_W / 2}
-        y={t.cy - TABLE_H / 2}
-        width={TABLE_W}
-        height={TABLE_H}
-        rx={TABLE_R}
-        ry={TABLE_R}
-        fill="#e9eef7"
-        stroke={strokeColor}   // 👈 borde del color de la zona
-        strokeWidth={4}        // 👈 más delgadito (ajusta a 3 si lo quieres aún más fino)
-      />
-
-      <text
-        x={t.cx}
-        y={t.cy + 8}
-        fontSize={30}
-        textAnchor="middle"
-        fill="#334155"
-        style={{
-          pointerEvents: "none",
-          fontWeight: 900,
-          letterSpacing: 0.6,
-        }}
-      >
-        {label}
-      </text>
-    </g>
-  );
-};
-
+    return (
+      <g key={`${t.id}-rect`}>
+        <rect
+          x={t.cx - TABLE_W / 2}
+          y={t.cy - TABLE_H / 2}
+          width={TABLE_W}
+          height={TABLE_H}
+          rx={TABLE_R}
+          ry={TABLE_R}
+          fill="#e9eef7"
+          stroke={strokeColor}
+          strokeWidth={4}   // borde delgado
+        />
+        <text
+          x={t.cx}
+          y={t.cy + 8}
+          fontSize={30}
+          textAnchor="middle"
+          fill="#334155"
+          style={{
+            pointerEvents: "none",
+            fontWeight: 900,
+            letterSpacing: 0.6,
+          }}
+        >
+          {label}
+        </text>
+      </g>
+    );
+  };
 
   return (
     <div style={{ background: "#0b1220", borderRadius: 12, overflow: "hidden" }}>
       <svg
-        viewBox="300 -30 2600 2750"
-        style={{ width: "100%", height: 1000, cursor: drag.current ? "grabbing" : "grab" }}
+        // 👇 viewBox fijo que ya funcionaba, solo un poco más compacto
+        viewBox="300 -30 2600 2450"
+        style={{
+          width: "100%",
+          height: 720,
+          cursor: drag.current ? "grabbing" : "grab",
+        }}
         onWheel={onWheel}
         onMouseDown={onMouseDown}
         onMouseUp={onMouseUp}
         onMouseMove={onMouseMove}
       >
         <g transform={`translate(${offset.x} ${offset.y}) scale(${scale})`}>
-          {/* Stage */}
+          {/* ESCENARIO */}
           <g transform="translate(-80, 750)">
-            <rect x="-100" y="-190" width="250" height="830" fill="#ffffffff" rx="10" />
-            <text x="-150" y="10" fill="#000000ff" fontSize="90" textAnchor="middle" transform="rotate(-90 44,0)">
+            <rect x="-100" y="-190" width="250" height="830" fill="#ffffff" rx="10" />
+            <text
+              x="-150"
+              y="10"
+              fill="#000000"
+              fontSize="90"
+              textAnchor="middle"
+              transform="rotate(-90 44,0)"
+            >
               ESCENARIO
             </text>
           </g>
 
-          {/* Mesas + asientos */}
+          {/* MESAS + ASIENTOS */}
           {tables.map((t) => {
-            // 👇 si la mesa está deshabilitada, no se dibuja ni la mesa ni sus asientos
-            if (disabledTables?.has(t.id)) {
-              return null;
-            }
+            if (disabledTables?.has(t.id)) return null;
 
             return (
               <g key={t.id}>
                 {renderTableRect(t)}
                 {t.seats.map((s) => {
                   const sel = (selected[t.id] || []).includes(s.id);
-
                   const key = `${t.id}:${s.id}`;
                   const isBlocked = blockedKeys?.has(key) ?? false;
 
-                  const visualState =
-                    isBlocked
-                      ? "reserved"
-                      : s.status === "available"
-                      ? (sel ? "selected" : "available")
-                      : s.status;
+                  const visualState = isBlocked
+                    ? "reserved"
+                    : s.status === "available"
+                    ? (sel ? "selected" : "available")
+                    : s.status;
 
                   const fill = colorBy(visualState as any);
-
-                  const shouldHide = onlyAvailable && !sel && visualState === "held";
+                  const shouldHide =
+                    onlyAvailable && !sel && visualState === "held";
                   if (shouldHide) return null;
 
                   return (
@@ -519,8 +531,15 @@ const renderTableRect = (t: TableGeom) => {
                         opacity: isBlocked && !sel ? 0.9 : 1,
                       }}
                     >
-                      <circle cx={s.x} cy={s.y} r={26} fill="transparent" stroke="none" />
-                      <circle cx={s.x} cy={s.y} r={18} fill={fill} stroke="#111827" strokeWidth={2} />
+                      <circle cx={s.x} cy={s.y} r={26} fill="transparent" />
+                      <circle
+                        cx={s.x}
+                        cy={s.y}
+                        r={18}
+                        fill={fill}
+                        stroke="#111827"
+                        strokeWidth={2}
+                      />
                       <text
                         x={s.x}
                         y={s.y + 5}
@@ -537,11 +556,15 @@ const renderTableRect = (t: TableGeom) => {
               </g>
             );
           })}
+
+          
         </g>
       </svg>
     </div>
   );
 }
+
+
 
 /* -------------------------- Main Page Component -------------------------- */
 export default function SeatSelectionPage() {

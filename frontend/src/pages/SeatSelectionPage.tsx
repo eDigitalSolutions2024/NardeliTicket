@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getEvent, fetchBlockedSeats } from "../api/events"; // 👈 precios y nombre desde Mongo
+import { buildTables, TABLE_W,TABLE_H, TABLE_R, numToLetter, type TableGeom, } from "../layout/salonLayout";
 
 const SALON_IMG = "/salon_blueprint.jpg"; // ruta en /public
 
@@ -183,7 +184,7 @@ function SeatDot({
 }
 
 /* -------------------------- Embedded SVG Map -------------------------- */
-const TABLE_W = 190;
+/*const TABLE_W = 190;
 const TABLE_H = 120;
 const TABLE_R = 18;
 
@@ -204,23 +205,23 @@ const makePattern = ({
   leftX: number;
   rightX: number;
 }): [number, number][] => [
-  // fila superior: 5 asientos
-  [-72, topY],
-  [-36, topY],
-  [0, topY],
-  [36, topY],
-  [72, topY],
+  // fila superior: 4 asientos
+  [-54, topY],
+  [-18, topY],
+  [18, topY],
+  [54, topY],
 
-  // fila inferior: 5 asientos
-  [-72, bottomY],
-  [-36, bottomY],
-  [0, bottomY],
-  [36, bottomY],
-  [72, bottomY],
+  // fila inferior: 4 asientos
+  [-54, bottomY],
+  [-18, bottomY],
+  [18, bottomY],
+  [54, bottomY],
 
+  // laterales: 1 a cada lado
   [leftX, 0],
   [rightX, 0],
 ];
+
 
 const SEAT_PATTERN_VIP = makePattern(VIP_OFFSETS);
 const SEAT_PATTERN_ORO = makePattern(ORO_OFFSETS);
@@ -247,6 +248,126 @@ type TableGeom = {
   cy: number;
 };
 
+type TableDef = {
+  id: string;
+  zoneId: "VIP" | "ORO";
+  name: string;
+  cx: number;
+  cy: number;
+};
+
+const TABLE_OFFSETS: Record<string, { dx: number; dy: number }> = {
+  //Asientos VIP
+  "VIP-01": { dx: 100, dy: -50 },
+  "VIP-02": { dx: 50, dy: -50 },
+
+  "VIP-03": { dx: STEP_X * -1.72, dy: 210 },
+  "VIP-04": { dx: 390, dy: -39  },
+
+  "VIP-05": { dx: -245, dy: 190 },
+  "VIP-06": { dx: -290, dy: 190 },
+
+  "VIP-07": { dx: 95, dy: 170 },
+  "VIP-08": { dx: 50, dy: 170 },
+
+  "VIP-09": { dx: -585, dy: 400 },
+  "VIP-10": { dx: 390, dy: 150 },
+
+  "VIP-11": { dx: -245, dy: 380 },
+  "VIP-12": { dx: -290, dy: 380},
+
+
+  "VIP-13": { dx: 95, dy: 360},
+  "VIP-14": { dx: 50, dy: 360 },
+
+  //mesa que no se mostrara
+  "VIP-15": { dx: -175, dy: 10 * STEP_Y },
+
+  //ASIENTOS EN ORO
+  "ORO-01": { dx: -1300, dy: -190 },
+
+
+  "ORO-02": { dx: -1640, dy: 1500 },
+  "ORO-03": { dx: -1980, dy: 1720 },
+  "ORO-04": { dx: -1430, dy: -50 },
+  "ORO-05": { dx: -1770, dy: 210 },
+  "ORO-06": { dx: -410, dy: 190 },
+  "ORO-07": { dx: -750, dy: 420 },
+  "ORO-08": { dx: -1090, dy: 650 },
+  "ORO-09": { dx: -1430, dy: 880 },
+  "ORO-10": { dx: -1770, dy: 1110 },
+
+  "ORO-11": { dx: -120, dy: -550 },
+  "ORO-12": { dx: -460, dy: -290 },
+  "ORO-13": { dx: -800, dy: -60 },
+  "ORO-14": { dx: -1140, dy: 170 },
+  "ORO-15": { dx: -1480, dy: 400 },
+  "ORO-16": { dx: -120, dy: 380 },
+  "ORO-17": { dx: -460, dy: 830 },
+
+  "ORO-18": { dx: -510, dy: -800 },
+  "ORO-19": { dx: -850, dy: -540 },
+  "ORO-20": { dx: -1190, dy: -310 },
+  "ORO-21": { dx: 170, dy: -330 },
+  "ORO-22": { dx: -170, dy: -100 },
+  "ORO-23": { dx: -510, dy: 130 },
+
+  "ORO-24": { dx: 0, dy: 100000000 },
+  "ORO-25": { dx: 0, dy: 1000000 },
+  
+};
+
+const TABLE_DEFS: TableDef[] = (() => {
+  const defs: TableDef[] = [];
+
+  // ----- ZONA VIP (3 x 5) -----
+  const vipOrigin = { x: 260, y: 300 };
+  let tVip = 0;
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 3; c++) {
+      tVip++;
+      const id = `VIP-${String(tVip).padStart(2, "0")}`;
+
+      // 👇 let para poder sumar el offset
+      let cx = vipOrigin.x + c * STEP_X;
+      let cy = vipOrigin.y + r * STEP_Y;
+
+      const off = TABLE_OFFSETS[id];
+      if (off) {
+        cx += off.dx;
+        cy += off.dy;
+      }
+
+      defs.push({ id, zoneId: "VIP", name: `Mesa VIP ${tVip}`, cx, cy });
+    }
+  }
+
+  // ----- ZONA ORO (5 x 5) -----
+  const oroOrigin = { x: 1350, y: 300 };
+  let tOro = 0;
+  for (let r = 0; r < 5; r++) {
+    for (let c = 0; c < 5; c++) {          // 👈 aquí iba `r++` por error
+      tOro++;
+      const id = `ORO-${String(tOro).padStart(2, "0")}`;
+
+      // 👇 igual: let + suma correcta
+      let cx = oroOrigin.x + c * STEP_X;   // antes estabas asignando con "=" al origin
+      let cy = oroOrigin.y + r * STEP_Y;
+
+      const off = TABLE_OFFSETS[id];
+      if (off) {
+        cx += off.dx;
+        cy += off.dy;
+      }
+
+      defs.push({ id, zoneId: "ORO", name: `Mesa Oro ${tOro}`, cx, cy });
+    }
+  }
+
+  return defs;
+})();*/
+
+
 function SeatMapSVG({
   selected,
   onlyAvailable,
@@ -254,6 +375,7 @@ function SeatMapSVG({
   onReady,
   onPreview, // 👈 nuevo
   blockedKeys,
+  disabledTables,
 }: {
   selected: Record<string, string[]>;
   onlyAvailable: boolean;
@@ -261,83 +383,9 @@ function SeatMapSVG({
   onReady: (tables: TableGeom[]) => void;
   onPreview: () => void; // 👈 nuevo
   blockedKeys?: Set<string>;
+  disabledTables?: Set<string>;
 }) {
-  const tables = useMemo<TableGeom[]>(() => {
-    const out: TableGeom[] = [];
-    let seatGlobal = 0;
-
-    // ZONA VIP (izquierda) 3 x 5
-    const vipOrigin = { x: 260, y: 300 };
-    let tVip = 0;
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < 3; c++) {
-        tVip++;
-        const id = `VIP-${String(tVip).padStart(2, "0")}`;
-        const tableLetter = numToLetter(tVip);
-
-        const cx = vipOrigin.x + c * STEP_X;
-        const cy = vipOrigin.y + r * STEP_Y;
-        const seats: SeatNode[] = SEAT_PATTERN_VIP.map(([dx, dy], i) => {
-          seatGlobal++;
-          return {
-            id: `S${seatGlobal}`,
-            label: `${tableLetter}${i + 1}`,
-            x: cx + dx,
-            y: cy + dy,
-            status: "available",
-            zoneId: "VIP",
-            tableId: id,
-          };
-        });
-        out.push({
-          id,
-          name: `Mesa VIP ${tVip}`,
-          zoneId: "VIP",
-          seats,
-          capacity: seats.length,
-          cx,
-          cy,
-        });
-      }
-    }
-
-    // ZONA ORO (derecha) 5 x 5
-    const oroOrigin = { x: 1350, y: 300 };
-    let tOro = 0;
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < 5; c++) {
-        tOro++;
-        const id = `ORO-${String(tOro).padStart(2, "0")}`;
-        const tableLetter = numToLetter(tOro);
-
-        const cx = oroOrigin.x + c * STEP_X;
-        const cy = oroOrigin.y + r * STEP_Y;
-        const seats: SeatNode[] = SEAT_PATTERN_ORO.map(([dx, dy], i) => {
-          seatGlobal++;
-          return {
-            id: `S${seatGlobal}`,
-            label: `${tableLetter}${i + 1}`,
-            x: cx + dx,
-            y: cy + dy,
-            status: "available",
-            zoneId: "ORO",
-            tableId: id,
-          };
-        });
-        out.push({
-          id,
-          name: `Mesa Oro ${tOro}`,
-          zoneId: "ORO",
-          seats,
-          capacity: seats.length,
-          cx,
-          cy,
-        });
-      }
-    }
-
-    return out;
-  }, []);
+const tables = useMemo<TableGeom[]>(() => buildTables(), []);
 
   // Pan/Zoom
   const [scale, setScale] = useState(1);
@@ -368,49 +416,56 @@ function SeatMapSVG({
       ? "#f59e0b"
       : "#ef4444";
 
-  const renderTableRect = (t: TableGeom) => {
-    const [zone, numStr] = t.id.split("-");
-    const num = parseInt(numStr, 10);
-    const label =
-      !isNaN(num) && num >= 1 ? `${zone}-${numToLetter(num)}`
-      : t.id;
+  const zoneColor = (zone: "VIP" | "ORO") =>
+    zone === "VIP" ? "#1e62ff" : "#d4af37";
 
-    return (
-      <g key={`${t.id}-rect`}>
-        <rect
-          x={t.cx - TABLE_W / 2}
-          y={t.cy - TABLE_H / 2}
-          width={TABLE_W}
-          height={TABLE_H}
-          rx={TABLE_R}
-          ry={TABLE_R}
-          fill="#e9eef7"
-          stroke="#8aa0c7"
-          strokeWidth={2}
-        />
-        <text
-          x={t.cx}
-          y={t.cy + 8}
-          fontSize={30}
-          textAnchor="middle"
-          fill="#334155"
-          style={{
-            pointerEvents: "none",
-            fontWeight: 900,
-            letterSpacing: 0.6,
-          }}
-        >
-          {label}
-        </text>
-      </g>
-    );
-  };
+const renderTableRect = (t: TableGeom) => {
+  const [zone, numStr] = t.id.split("-");
+  const num = parseInt(numStr, 10);
+  const label =
+    !isNaN(num) && num >= 1 ? `${zone}-${numToLetter(num)}` : t.id;
+
+  // color según zona
+  const strokeColor = t.zoneId === "VIP" ? "#1e62ff" : "#d4af37";
+
+  return (
+    <g key={`${t.id}-rect`}>
+      <rect
+        x={t.cx - TABLE_W / 2}
+        y={t.cy - TABLE_H / 2}
+        width={TABLE_W}
+        height={TABLE_H}
+        rx={TABLE_R}
+        ry={TABLE_R}
+        fill="#e9eef7"
+        stroke={strokeColor}   // 👈 borde del color de la zona
+        strokeWidth={4}        // 👈 más delgadito (ajusta a 3 si lo quieres aún más fino)
+      />
+
+      <text
+        x={t.cx}
+        y={t.cy + 8}
+        fontSize={30}
+        textAnchor="middle"
+        fill="#334155"
+        style={{
+          pointerEvents: "none",
+          fontWeight: 900,
+          letterSpacing: 0.6,
+        }}
+      >
+        {label}
+      </text>
+    </g>
+  );
+};
+
 
   return (
     <div style={{ background: "#0b1220", borderRadius: 12, overflow: "hidden" }}>
       <svg
-        viewBox="0 0 3000 1600"
-        style={{ width: "100%", height: 760, cursor: drag.current ? "grabbing" : "grab" }}
+        viewBox="300 -30 2600 2750"
+        style={{ width: "100%", height: 1000, cursor: drag.current ? "grabbing" : "grab" }}
         onWheel={onWheel}
         onMouseDown={onMouseDown}
         onMouseUp={onMouseUp}
@@ -418,171 +473,71 @@ function SeatMapSVG({
       >
         <g transform={`translate(${offset.x} ${offset.y}) scale(${scale})`}>
           {/* Stage */}
-          <g transform="translate(40, 520)">
-            <rect x="0" y="-190" width="88" height="380" fill="#111" rx="10" />
-            <text x="44" y="0" fill="#e5e7eb" fontSize="20" textAnchor="middle" transform="rotate(-90 44,0)">
-              STAGE
+          <g transform="translate(-80, 750)">
+            <rect x="-100" y="-190" width="250" height="830" fill="#ffffffff" rx="10" />
+            <text x="-150" y="10" fill="#000000ff" fontSize="90" textAnchor="middle" transform="rotate(-90 44,0)">
+              ESCENARIO
             </text>
-          </g>
-
-          {/* Marcos de zona */}
-          {/* VIP */}
-          <rect x="100" y="120" width="1025" height="1400" fill="none" stroke="#1e62ff" strokeWidth={14} rx={20} />
-          <g transform="translate(140, 205)">
-            <text x="200" y="-105" fill="#e5e7eb" fontSize={34} fontWeight={900}>
-              ZONA VIP — 15 mesas × 12 asientos
-            </text>
-          </g>
-
-          {/* ORO */}
-          <rect x="1150" y="120" width="1800" height="1400" fill="none" stroke="#d4af37" strokeWidth={14} rx={20} />
-          <g transform="translate(1420, 205)">
-            <text x="400" y="-105" fill="#e5e7eb" fontSize={34} fontWeight={900}>
-              ZONA ORO — 25 mesas × 12 asientos
-            </text>
-          </g>
-
-          {/* Botón lateral PREVIEW – versión grande */}
-          <g
-            transform="translate(2860, 320)"
-            role="button"
-            tabIndex={0}
-            onClick={onPreview}
-            onKeyDown={(e: any) => (e.key === "Enter" || e.key === " ") && onPreview()}
-            style={{ cursor: "pointer" }}
-          >
-            <filter id="btnGlowBig" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="0" stdDeviation="10" floodColor="#000" floodOpacity="0.6" />
-              <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#fbbf24" floodOpacity="0.9" />
-            </filter>
-
-            <rect
-              x="50"
-              y="-130"
-              width="70"
-              height="260"
-              rx="18"
-              fill="#111"
-              stroke="#fbbf24"
-              strokeWidth={4}
-              filter="url(#btnGlowBig)"
-            />
-
-            <g transform="translate(85, -85)">
-              <rect x="-13" y="-10" width="26" height="20" rx="4" fill="#e5e7eb" />
-              <circle cx="0" cy="0" r="5" fill="#111827" />
-              <rect x="10" y="-8" width="8" height="6" rx="2" fill="#e5e7eb" />
-            </g>
-
-            <text
-              x="35"
-              y="75"
-              fill="#e5e7eb"
-              fontSize="18"
-              fontWeight="900"
-              textAnchor="middle"
-              transform="rotate(-90 35,20)"
-              style={{ letterSpacing: 3, userSelect: "none" }}
-            >
-              PREVIEW
-            </text>
-
-            <circle cx="80" cy="115" r="8" fill="#fbbf24" opacity="0.9">
-              <animate attributeName="r" values="8;18;8" dur="1.6s" repeatCount="indefinite" />
-              <animate attributeName="opacity" values="0.9;0.1;0.9" dur="1.6s" repeatCount="indefinite" />
-            </circle>
-
-            <g transform="translate(50, -160)" opacity="0.95">
-              <rect x="-8" y="-28" width="190" height="38" rx="10" fill="#111827" stroke="#374151" />
-              <text
-                x="88"
-                y="-5"
-                fill="#e5e7eb"
-                fontSize="14"
-                fontWeight="600"
-                textAnchor="middle"
-                style={{ pointerEvents: "none" }}
-              >
-                Ver plano del salón
-              </text>
-              <polygon points="86,8 96,-2 76,-2" fill="#111827" />
-            </g>
           </g>
 
           {/* Mesas + asientos */}
-          {tables.map((t) => (
-            <g key={t.id}>
-              {renderTableRect(t)}
-              {t.seats.map((s) => {
-                const sel = (selected[t.id] || []).includes(s.id);
+          {tables.map((t) => {
+            // 👇 si la mesa está deshabilitada, no se dibuja ni la mesa ni sus asientos
+            if (disabledTables?.has(t.id)) {
+              return null;
+            }
 
-                // 👉 bloqueo por backend + admin
-                const key = `${t.id}:${s.id}`;
-                const isBlocked = blockedKeys?.has(key) ?? false;
+            return (
+              <g key={t.id}>
+                {renderTableRect(t)}
+                {t.seats.map((s) => {
+                  const sel = (selected[t.id] || []).includes(s.id);
 
-                // estado visual (si está bloqueado, lo mostramos como "reserved")
-                const visualState =
-                  isBlocked ? "reserved" : s.status === "available" ? (sel ? "selected" : "available") : s.status;
-                const fill = colorBy(visualState as any);
+                  const key = `${t.id}:${s.id}`;
+                  const isBlocked = blockedKeys?.has(key) ?? false;
 
-                const shouldHide = onlyAvailable && !sel && visualState === "held";
-                if (shouldHide) return null;
+                  const visualState =
+                    isBlocked
+                      ? "reserved"
+                      : s.status === "available"
+                      ? (sel ? "selected" : "available")
+                      : s.status;
 
-                return (
-                  <g
-                    key={s.id}
-                    onClick={() => {
-                      if (isBlocked && !sel) return;
-                      onToggle(t.id, s.id);
-                    }}
-                    style={{
-                      cursor: isBlocked && !sel ? "not-allowed" : "pointer",
-                      opacity: isBlocked && !sel ? 0.9 : 1,
-                    }}
-                  >
-                    <circle
-                      cx={s.x}
-                      cy={s.y}
-                      r={26}
-                      fill="transparent"
-                      stroke="none"
-                    />
-                    <circle
-                      cx={s.x}
-                      cy={s.y}
-                      r={18}
-                      fill={fill}
-                      stroke="#111827"
-                      strokeWidth={2}
-                    />
-                    <text
-                      x={s.x}
-                      y={s.y + 5}
-                      textAnchor="middle"
-                      fontSize={12}
-                      fill="#0b1220"
-                      style={{ pointerEvents: "none", fontWeight: 700 }}
+                  const fill = colorBy(visualState as any);
+
+                  const shouldHide = onlyAvailable && !sel && visualState === "held";
+                  if (shouldHide) return null;
+
+                  return (
+                    <g
+                      key={s.id}
+                      onClick={() => {
+                        if (isBlocked && !sel) return;
+                        onToggle(t.id, s.id);
+                      }}
+                      style={{
+                        cursor: isBlocked && !sel ? "not-allowed" : "pointer",
+                        opacity: isBlocked && !sel ? 0.9 : 1,
+                      }}
                     >
-                      {s.label}
-                    </text>
-                  </g>
-                );
-              })}
-            </g>
-          ))}
-
-          {/* Leyenda */}
-          <g transform="translate(140, 1560)">
-            <rect x="0" y="-34" width="600" height="52" fill="#0f1629" rx="12" />
-            <line x1="20" y1="-10" x2="80" y2="-10" stroke="#1e62ff" strokeWidth={10} />
-            <text x="92" y="-3" fill="#e5e7eb" fontSize={18}>
-              Marco Azul = VIP
-            </text>
-            <line x1="300" y1="-10" x2="360" y2="-10" stroke="#d4af37" strokeWidth={10} />
-            <text x="372" y="-3" fill="#e5e7eb" fontSize={18}>
-              Marco Dorado = Zona ORO
-            </text>
-          </g>
+                      <circle cx={s.x} cy={s.y} r={26} fill="transparent" stroke="none" />
+                      <circle cx={s.x} cy={s.y} r={18} fill={fill} stroke="#111827" strokeWidth={2} />
+                      <text
+                        x={s.x}
+                        y={s.y + 5}
+                        textAnchor="middle"
+                        fontSize={12}
+                        fill="#0b1220"
+                        style={{ pointerEvents: "none", fontWeight: 700 }}
+                      >
+                        {s.label}
+                      </text>
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
         </g>
       </svg>
     </div>
@@ -639,8 +594,8 @@ export default function SeatSelectionPage() {
   }, [eventId, selected]);
 
   // Inyectar mesas al layout
-  type TableGeomLocal = TableGeom; // solo para tipado local
-  const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
+  //type TableGeomLocal = TableGeom; // solo para tipado local
+  const injectTablesIntoLayout = useCallback((tables: TableGeom[]) => {
     setLayout((prev) => {
       if (!prev) return prev;
       const clone: EventLayout = JSON.parse(JSON.stringify(prev));
@@ -762,6 +717,11 @@ export default function SeatSelectionPage() {
     return { subtotal, fees, total: subtotal + fees, seatCount };
   }, [layout, selectionItems]);
 
+   const disabledTablesSet = useMemo(() => {
+    if (!layout?.disabledTables) return new Set<string>();
+    return new Set(layout.disabledTables);
+  }, [layout?.disabledTables]);
+
   const maxReached =
     layout?.maxSeatsPerOrder && totals.seatCount > (layout.maxSeatsPerOrder ?? Infinity);
 
@@ -820,6 +780,7 @@ export default function SeatSelectionPage() {
           onReady={injectTablesIntoLayout}
           onPreview={() => setShowPreview(true)}
           blockedKeys={blockedKeys}
+          disabledTables={disabledTablesSet}
         />
       </div>
 

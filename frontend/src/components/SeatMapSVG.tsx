@@ -154,36 +154,56 @@ export default function SeatMapSVG({
     : "#ef4444";
 
   // helpers para mesa visual
-  const renderTable = (t: TableGeom) => {
-    // mesa centrada en cx,cy (120×60)
-    const w = 120, h = 60, r = 10;
-    return (
-      <g key={t.id}>
-        <rect
-          x={t.cx - w / 2}
-          y={t.cy - h / 2}
-          width={w}
-          height={h}
-          rx={r}
-          ry={r}
-          fill="#e9eef7"
-          stroke="#8aa0c7"
-          strokeWidth={2}
-        />
-        {/* etiqueta pequeña de mesa */}
-        <text
-          x={t.cx}
-          y={t.cy + 5}
-          fontSize={12}
-          textAnchor="middle"
-          fill="#334155"
-          style={{ pointerEvents: "none", fontWeight: 600 }}
-        >
-          {t.id}
-        </text>
-      </g>
-    );
-  };
+// helpers para mesa visual
+// helpers para mesa visual
+const renderTable = (t: TableGeom) => {
+  // mesa centrada en cx,cy (120×60)
+  const w = 120, h = 60, r = 10;
+
+  const c = zoneColor(t.zoneId); // 👈 azul VIP / dorado ORO
+
+  return (
+    <g key={t.id}>
+      {/* rectángulo de la mesa */}
+      <rect
+        x={t.cx - w / 2}
+        y={t.cy - h / 2}
+        width={w}
+        height={h}
+        rx={r}
+        ry={r}
+        fill="#e9eef7"
+        stroke={c}        // 👈 borde del color de la zona
+        strokeWidth={4}   // 👈 más grueso para que se note
+      />
+
+      {/* "línea" de color encima de la mesa, bien notoria */}
+      <line
+        x1={t.cx - w / 2}
+        y1={t.cy - h / 2 - 6}
+        x2={t.cx + w / 2}
+        y2={t.cy - h / 2 - 6}
+        stroke={c}
+        strokeWidth={6}
+        strokeLinecap="round"
+      />
+
+      {/* etiqueta pequeña de mesa */}
+      <text
+        x={t.cx}
+        y={t.cy + 5}
+        fontSize={12}
+        textAnchor="middle"
+        fill="#334155"
+        style={{ pointerEvents: "none", fontWeight: 600 }}
+      >
+        {t.id}
+      </text>
+    </g>
+  );
+};
+
+
 
   return (
     <div style={{ background: "#0b1220", borderRadius: 12, overflow: "hidden" }}>
@@ -303,15 +323,45 @@ export default function SeatMapSVG({
             );
           })}
 
-
-          {/* Leyenda */}
+          {/* Leyenda zonas VIP / ORO */}
           <g transform="translate(70, 720)">
-            <rect x="0" y="-28" width="420" height="40" fill="#0f1629" rx="10" />
-            <line x1="18" y1="-8" x2="60" y2="-8" stroke="#d4af37" strokeWidth={8} />
-            <text x="70" y="-3" fill="#e5e7eb" fontSize="16">Marco Dorado = Zona ORO</text>
-            <line x1="250" y1="-8" x2="292" y2="-8" stroke="#1e62ff" strokeWidth={8} />
-            <text x="302" y="-3" fill="#e5e7eb" fontSize="16">Marco Azul = VIP</text>
+            <rect
+              x="0"
+              y="-28"
+              width="420"
+              height="40"
+              fill="#0f1629"
+              rx="10"
+            />
+            {/* ORO */}
+            <line
+              x1="18"
+              y1="-8"
+              x2="60"
+              y2="-8"
+              stroke="#d4af37"   // dorado
+              strokeWidth={8}
+            />
+            <text x="70" y="-3" fill="#e5e7eb" fontSize={16}>
+              Marco dorado = Zona ORO
+            </text>
+
+            {/* VIP */}
+            <line
+              x1="250"
+              y1="-8"
+              x2="292"
+              y2="-8"
+              stroke="#1e62ff"   // azul
+              strokeWidth={8}
+            />
+            <text x="302" y="-3" fill="#e5e7eb" fontSize={16}>
+              Marco azul = VIP
+            </text>
           </g>
+
+
+
         </g>
       </svg>
     </div>

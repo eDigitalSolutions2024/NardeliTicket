@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createEvent, deleteEvent, fetchEvents, updateEvent } from "../api/events";
 import type { EventItem, EventSession, EventStatus } from "../types/Event";
 import { fetchSales, type TicketSale, type SalesQuery } from "../api/admin";
+import { buildTables, TABLE_W, TABLE_H, TABLE_R, numToLetter, type TableGeom } from "../layout/salonLayout";
 import "../CSS/adminDashboard.css";
 
 /* ==== helpers UI ==== */
@@ -476,6 +477,44 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {/* Layout / Mesas deshabilitadas */}
+            <div
+              style={{
+                marginTop: 16,
+                /*padding: 12,
+                borderRadius: 10,
+                border: "1px solid #e5e7eb",
+                background: "#f9fafb",*/
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <strong>Layout del salón</strong>
+                <span style={{ fontSize: 12, color: "#6b7280" }}>
+                  Selecciona las mesas que NO se podrán vender para este evento.
+                </span>
+              </div>
+              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12 }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setShowLayoutModal(true)}
+                >
+                  Configurar layout (mesas)
+                </button>
+                {form.disabledTables && form.disabledTables.length > 0 ? (
+                  <small style={{ color: "#374151" }}>
+                    Mesas deshabilitadas:{" "}
+                    <strong>{form.disabledTables.join(", ")}</strong>
+                  </small>
+                ) : (
+                  <small style={{ color: "#6b7280" }}>
+                    No hay mesas deshabilitadas.
+                  </small>
+                )}
+              </div>
+            </div>
+
+
             {/* Sesiones */}
             <div className="sessions">
               <strong>Sesiones / Fechas</strong>
@@ -519,43 +558,7 @@ export default function AdminDashboard() {
               )}
             </div>
 
-            {/* Layout / Mesas deshabilitadas */}
-            <div
-              style={{
-                marginTop: 16,
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid #e5e7eb",
-                background: "#f9fafb",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <strong>Layout del salón</strong>
-                <span style={{ fontSize: 12, color: "#6b7280" }}>
-                  Selecciona las mesas que NO se podrán vender para este evento.
-                </span>
-              </div>
-              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12 }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setShowLayoutModal(true)}
-                >
-                  Configurar layout (mesas)
-                </button>
-                {form.disabledTables && form.disabledTables.length > 0 ? (
-                  <small style={{ color: "#374151" }}>
-                    Mesas deshabilitadas:{" "}
-                    <strong>{form.disabledTables.join(", ")}</strong>
-                  </small>
-                ) : (
-                  <small style={{ color: "#6b7280" }}>
-                    No hay mesas deshabilitadas.
-                  </small>
-                )}
-              </div>
-            </div>
-
+            
             <div
               className="form-actions"
               style={{ marginTop: 12, display: "flex", gap: 8 }}
@@ -1055,60 +1058,66 @@ function LayoutEditorModal({
     label: string;
   };
 
-  const numToLetter = (n: number) =>
-    String.fromCharCode("A".charCodeAt(0) + (n - 1));
 
-  // Geometría simplificada basada en SeatSelectionPage
-  const tables: LayoutTable[] = useMemo(() => {
-    const out: LayoutTable[] = [];
 
-    // Constantes aproximadas del mapa grande
-    
-    const STEP_X = 340;
-    const STEP_Y = 250;
+const tables: LayoutTable[] = useMemo(() => {
+  // Geometría real del salón
+  const geom: TableGeom[] = buildTables();
 
-    // VIP (izquierda) 3x5
-    const vipOrigin = { x: 260, y: 300 };
-    let tVip = 0;
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < 3; c++) {
-        tVip++;
-        const id = `VIP-${String(tVip).padStart(2, "0")}`;
-        const cx = vipOrigin.x + c * STEP_X;
-        const cy = vipOrigin.y + r * STEP_Y;
-        const letter = numToLetter(tVip);
-        out.push({
-          id,
-          zoneId: "VIP",
-          cx,
-          cy,
-          label: `VIP-${letter}`,
-        });
-      }
-    }
+  // 🔴 Filtramos las mesas que mandaste al infinito (ORO-24, ORO-25, etc.)
+  const filtered = geom.filter(
+    (t) =>
+      Math.abs(t.cx) < 5000 &&
+      Math.abs(t.cy) < 5000 &&
+      !["ORO-24", "ORO-25", "VIP-15"].includes(t.id) // si quieres ocultarlas también del admin
+  );
 
-    // ORO (derecha) 5x5
-    const oroOrigin = { x: 1350, y: 300 };
-    let tOro = 0;
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < 5; c++) {
-        tOro++;
-        const id = `ORO-${String(tOro).padStart(2, "0")}`;
-        const cx = oroOrigin.x + c * STEP_X;
-        const cy = oroOrigin.y + r * STEP_Y;
-        const letter = numToLetter(tOro);
-        out.push({
-          id,
-          zoneId: "ORO",
-          cx,
-          cy,
-          label: `ORO-${letter}`,
-        });
-      }
-    }
+  return filtered.map((t) => {
+    const [zone, numStr] = t.id.split("-");
+    const num = parseInt(numStr || "1", 10) || 1;
+    const letter = numToLetter(num); // A, B, C...
 
-    return out;
-  }, []);
+    return {
+      id: t.id,
+      zoneId: t.zoneId,
+      cx: t.cx,
+      cy: t.cy,
+      label: `${zone}-${letter}`, // VIP-A, ORO-K, etc.
+    };
+  });
+}, []);
+
+// Escala solo para el modal de admin
+const TABLE_SCALE = 1.3; // prueba 1.3, 1.4 o lo que te guste
+const TABLE_W_MODAL = TABLE_W * TABLE_SCALE;
+const TABLE_H_MODAL = TABLE_H * TABLE_SCALE;
+const TABLE_R_MODAL = TABLE_R * TABLE_SCALE;
+
+
+  const layoutViewBox = useMemo(() => {
+    if (!tables.length) return "0 0 3000 1600";
+
+    const padX = 80;
+    const padY = 80;
+
+    const xs = tables.map((t) => t.cx);
+    const ys = tables.map((t) => t.cy);
+
+    const minX = Math.min(...xs) - TABLE_W / 2 - padX;
+    const maxX = Math.max(...xs) + TABLE_W / 2 + padX;
+    const minY = Math.min(...ys) - TABLE_H / 2 - padY;
+    const maxY = Math.max(...ys) + TABLE_H / 2 + padY;
+
+    let width = maxX - minX;
+    let height = maxY - minY;
+
+    if (width <= 0) width = 1;
+    if (height <= 0) height = 1;
+
+    return `${minX} ${minY} ${width} ${height}`;
+
+  }, [tables]);
+
 
   const [localDisabled, setLocalDisabled] = useState<Set<string>>(
     () => new Set(disabledTables)
@@ -1147,9 +1156,9 @@ function LayoutEditorModal({
           color: "#e5e7eb",
           borderRadius: 14,
           border: "1px solid #1f2937",
-          maxWidth: "1200px",
+          maxWidth: "1000px",
           width: "100%",
-          maxHeight: "90vh",
+          maxHeight: "80vh",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -1188,25 +1197,18 @@ function LayoutEditorModal({
 
         <div style={{ padding: 12, flex: 1, overflow: "auto" }}>
           <svg
-            viewBox="0 0 3000 1600"
+            viewBox={layoutViewBox}
             style={{ width: "100%", maxHeight: 600 }}
           >
             {/* Stage */}
-            <g transform="translate(40, 520)">
-              <rect x="0" y="-190" width="88" height="380" fill="#111" rx="10" />
-              <text
-                x="44"
-                y="0"
-                fill="#e5e7eb"
-                fontSize="20"
-                textAnchor="middle"
-                transform="rotate(-90 44,0)"
-              >
-                STAGE
-              </text>
-            </g>
+            <g transform="translate(-80, 750)">
+            <rect x="-100" y="-190" width="250" height="830" fill="#ffffffff" rx="10" />
+            <text x="-150" y="10" fill="#000000ff" fontSize="90" textAnchor="middle" transform="rotate(-90 44,0)">
+              ESCENARIO
+            </text>
+          </g>
 
-            {/* Marcos zona VIP / ORO */}
+            {/* Marcos zona VIP / ORO 
             <rect
               x="100"
               y="120"
@@ -1249,15 +1251,11 @@ function LayoutEditorModal({
               >
                 ZONA ORO — 25 mesas
               </text>
-            </g>
+            </g> /*}
 
             {/* Mesas */}
             {tables.map((t) => {
               const isDisabled = localDisabled.has(t.id);
-              const TABLE_W = 190;
-              const TABLE_H = 120;
-              const TABLE_R = 18;
-
               const strokeBase = t.zoneId === "VIP" ? "#1e62ff" : "#d4af37";
 
               return (
@@ -1267,12 +1265,12 @@ function LayoutEditorModal({
                   style={{ cursor: "pointer" }}
                 >
                   <rect
-                    x={t.cx - TABLE_W / 2}
-                    y={t.cy - TABLE_H / 2}
-                    width={TABLE_W}
-                    height={TABLE_H}
-                    rx={TABLE_R}
-                    ry={TABLE_R}
+                    x={t.cx - TABLE_W_MODAL / 2}
+                    y={t.cy - TABLE_H_MODAL / 2}
+                    width={TABLE_W_MODAL}
+                    height={TABLE_H_MODAL}
+                    rx={TABLE_R_MODAL}
+                    ry={TABLE_R_MODAL}
                     fill={isDisabled ? "#111827" : "#e9eef7"}
                     stroke={isDisabled ? "#ef4444" : strokeBase}
                     strokeWidth={isDisabled ? 6 : 3}
@@ -1280,8 +1278,8 @@ function LayoutEditorModal({
                   />
                   <text
                     x={t.cx}
-                    y={t.cy + 8}
-                    fontSize={30}
+                    y={t.cy + 10}
+                    fontSize={30 * TABLE_SCALE}  // texto un poco más grande
                     textAnchor="middle"
                     fill={isDisabled ? "#fca5a5" : "#334155"}
                     style={{
@@ -1296,7 +1294,7 @@ function LayoutEditorModal({
               );
             })}
 
-            {/* Leyenda */}
+            {/* Leyenda 
             <g transform="translate(140, 1560)">
               <rect
                 x="0"
@@ -1328,7 +1326,7 @@ function LayoutEditorModal({
               <text x="432" y="-3" fill="#e5e7eb" fontSize={18}>
                 Mesa deshabilitada
               </text>
-            </g>
+            </g> */}
           </svg>
         </div>
 

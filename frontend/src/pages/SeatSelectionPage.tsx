@@ -373,7 +373,6 @@ function SeatMapSVG({
   onlyAvailable,
   onToggle,
   onReady,
-  onPreview,
   blockedKeys,
   disabledTables,
 }: {

@@ -13,6 +13,8 @@ import {
   ensureMergedTicketsPdf,
   mergedTicketFileName,
 } from "../utils/tickets";
+import { printNardeliTicket, NardeliTicketPayload } from "../utils/zebraPrinter";
+
 
 // ---------- Utilidades de pricing (centavos) ----------
 const SERVICE_FEE_PCT = 5;
@@ -308,6 +310,81 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
       });
 
       const orderId: string = String(order._id as unknown as Types.ObjectId);
+
+
+
+            // ------------------------
+      // IMPRIMIR BOLETO EN ZEBRA
+      // ------------------------
+      try {
+        const eventName: string =
+          (eventDoc as any)?.title ||
+          (eventDoc as any)?.name ||
+          "Evento Nardeli";
+
+        const eventDateRaw: any =
+          sessionDate ||
+          (eventDoc as any)?.sessions?.[0]?.date ||
+          (eventDoc as any)?.date ||
+          undefined;
+        const dateLabel: string = eventDateRaw
+          ? new Date(eventDateRaw).toLocaleString("es-MX", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })
+          : "-";
+
+        const eventPlace: string =
+          [ (eventDoc as any)?.venue, (eventDoc as any)?.city ]
+            .filter(Boolean)
+            .join(", ") ||
+          (eventDoc as any)?.place ||
+          "";
+
+        // Zona / mesa / asientos (resumen de toda la orden)
+        const firstItem = Array.isArray(items) && items.length > 0 ? items[0] : null;
+        const zone: string = firstItem?.zoneId
+          ? String(firstItem.zoneId).toUpperCase()
+          : "GENERAL";
+
+        const tableSet = new Set<string>();
+        const seatLabels: string[] = [];
+        for (const it of items as any[]) {
+          if (it.tableId) tableSet.add(String(it.tableId));
+          for (const s of it.seatIds || []) {
+            seatLabels.push(String(s));
+          }
+        }
+        const tableLabel = Array.from(tableSet).join(", ");
+
+        // Precio total en formato bonito
+        const totalPesos = pricing.totalCents / 100;
+        const priceLabel = new Intl.NumberFormat("es-MX", {
+          style: "currency",
+          currency: "MXN",
+        }).format(totalPesos);
+
+        const payload: NardeliTicketPayload = {
+          eventName,
+          dateLabel,
+          eventPlace,
+          orderFolio: orderId,
+          zone,
+          tableLabel,
+          seatLabels,
+          buyerName: cashCustomer.name.trim(),
+          priceLabel,
+          ticketCode: orderId, // lo mismo que Folio
+        };
+
+        await printNardeliTicket(payload);
+        console.log("✅ Boleto impreso en Zebra para orden", orderId);
+      } catch (printErr) {
+        console.error("Error imprimiendo boleto en Zebra:", printErr);
+      }
+
+
+
 
       // Para efectivo: los asientos ya quedan "vendidos" de inmediato
       const holdDocs = items.flatMap((it: any) =>

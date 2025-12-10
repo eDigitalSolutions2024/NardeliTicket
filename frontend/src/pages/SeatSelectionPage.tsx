@@ -131,10 +131,9 @@ async function fetchAvailability(eventId: string, eventName?: string): Promise<E
         tables: [],
       },
     ],
-    disabledTables: rawDisabled,   // 👈 aquí
+    disabledTables: rawDisabled, // 👈 aquí
   };
 }
-
 
 /* ----------------------------- Small UI ----------------------------- */
 function Pill({ children }: { children: React.ReactNode }) {
@@ -188,8 +187,8 @@ const TABLE_H = 120;
 const TABLE_R = 18;
 
 const STEP_X = 340;
-const STEP_Y = 250;
 
+// offsets para el patrón de asientos alrededor de la mesa
 const VIP_OFFSETS = { topY: -90, bottomY: 90, leftX: -120, rightX: 120 };
 const ORO_OFFSETS = { topY: -90, bottomY: 90, leftX: -120, rightX: 120 };
 
@@ -252,31 +251,38 @@ function SeatMapSVG({
   onlyAvailable,
   onToggle,
   onReady,
-  onPreview, // 👈 nuevo
+  onPreview,
   blockedKeys,
 }: {
   selected: Record<string, string[]>;
   onlyAvailable: boolean;
   onToggle: (tableId: string, seatId: string) => void;
   onReady: (tables: TableGeom[]) => void;
-  onPreview: () => void; // 👈 nuevo
+  onPreview: () => void;
   blockedKeys?: Set<string>;
 }) {
   const tables = useMemo<TableGeom[]>(() => {
     const out: TableGeom[] = [];
     let seatGlobal = 0;
 
-    // ZONA VIP (izquierda) 3 x 5
-    const vipOrigin = { x: 260, y: 300 };
+    // 🔹 Coords por FILA y COLUMNA (fácil de mover)
+    const VIP_ROW_Y = [300, 550, 800, 1050, 1300]; // 5 filas
+    const VIP_COL_X = [260, 260 + STEP_X, 260 + STEP_X * 2]; // 3 columnas
+
+    const ORO_ROW_Y = [300, 550, 800, 1050, 1300]; // 5 filas
+    const ORO_COL_X = [1350, 1350 + STEP_X, 1350 + STEP_X * 2, 1350 + STEP_X * 3, 1350 + STEP_X * 4]; // 5 columnas
+
+    // ZONA VIP — 3 x 5 (15 mesas)
     let tVip = 0;
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < 3; c++) {
+    for (let r = 0; r < VIP_ROW_Y.length; r++) {
+      for (let c = 0; c < VIP_COL_X.length; c++) {
         tVip++;
         const id = `VIP-${String(tVip).padStart(2, "0")}`;
         const tableLetter = numToLetter(tVip);
 
-        const cx = vipOrigin.x + c * STEP_X;
-        const cy = vipOrigin.y + r * STEP_Y;
+        const cx = VIP_COL_X[c];
+        const cy = VIP_ROW_Y[r];
+
         const seats: SeatNode[] = SEAT_PATTERN_VIP.map(([dx, dy], i) => {
           seatGlobal++;
           return {
@@ -289,6 +295,7 @@ function SeatMapSVG({
             tableId: id,
           };
         });
+
         out.push({
           id,
           name: `Mesa VIP ${tVip}`,
@@ -301,17 +308,17 @@ function SeatMapSVG({
       }
     }
 
-    // ZONA ORO (derecha) 5 x 5
-    const oroOrigin = { x: 1350, y: 300 };
+    // ZONA ORO — 5 x 5 (25 mesas)
     let tOro = 0;
-    for (let r = 0; r < 5; r++) {
-      for (let c = 0; c < 5; c++) {
+    for (let r = 0; r < ORO_ROW_Y.length; r++) {
+      for (let c = 0; c < ORO_COL_X.length; c++) {
         tOro++;
         const id = `ORO-${String(tOro).padStart(2, "0")}`;
         const tableLetter = numToLetter(tOro);
 
-        const cx = oroOrigin.x + c * STEP_X;
-        const cy = oroOrigin.y + r * STEP_Y;
+        const cx = ORO_COL_X[c];
+        const cy = ORO_ROW_Y[r];
+
         const seats: SeatNode[] = SEAT_PATTERN_ORO.map(([dx, dy], i) => {
           seatGlobal++;
           return {
@@ -324,6 +331,7 @@ function SeatMapSVG({
             tableId: id,
           };
         });
+
         out.push({
           id,
           name: `Mesa Oro ${tOro}`,
@@ -372,8 +380,7 @@ function SeatMapSVG({
     const [zone, numStr] = t.id.split("-");
     const num = parseInt(numStr, 10);
     const label =
-      !isNaN(num) && num >= 1 ? `${zone}-${numToLetter(num)}`
-      : t.id;
+      !isNaN(num) && num >= 1 ? `${zone}-${numToLetter(num)}` : t.id;
 
     return (
       <g key={`${t.id}-rect`}>
@@ -417,26 +424,61 @@ function SeatMapSVG({
         onMouseMove={onMouseMove}
       >
         <g transform={`translate(${offset.x} ${offset.y}) scale(${scale})`}>
-          {/* Stage */}
-          <g transform="translate(40, 520)">
-            <rect x="0" y="-190" width="88" height="380" fill="#111" rx="10" />
-            <text x="44" y="0" fill="#e5e7eb" fontSize="20" textAnchor="middle" transform="rotate(-90 44,0)">
-              STAGE
+          {/* ESCENARIO (horizontal arriba, entre zonas) */}
+          <g transform="translate(700, 80)">
+            <rect
+              x="0"
+              y="0"
+              width="1600"
+              height="80"
+              rx="24"
+              fill="#020617"
+              stroke="#1f2937"
+              strokeWidth={4}
+            />
+            <text
+              x="800"
+              y="50"
+              fill="#e5e7eb"
+              fontSize={32}
+              fontWeight={800}
+              textAnchor="middle"
+              style={{ letterSpacing: 6 }}
+            >
+              ESCENARIO
             </text>
           </g>
 
           {/* Marcos de zona */}
           {/* VIP */}
-          <rect x="100" y="120" width="1025" height="1400" fill="none" stroke="#1e62ff" strokeWidth={14} rx={20} />
-          <g transform="translate(140, 205)">
+          <rect
+            x="100"
+            y="140"
+            width="1025"
+            height="1380"
+            fill="none"
+            stroke="#1e62ff"
+            strokeWidth={14}
+            rx={20}
+          />
+          <g transform="translate(140, 225)">
             <text x="200" y="-105" fill="#e5e7eb" fontSize={34} fontWeight={900}>
               ZONA VIP — 15 mesas × 12 asientos
             </text>
           </g>
 
           {/* ORO */}
-          <rect x="1150" y="120" width="1800" height="1400" fill="none" stroke="#d4af37" strokeWidth={14} rx={20} />
-          <g transform="translate(1420, 205)">
+          <rect
+            x="1150"
+            y="140"
+            width="1800"
+            height="1380"
+            fill="none"
+            stroke="#d4af37"
+            strokeWidth={14}
+            rx={20}
+          />
+          <g transform="translate(1420, 225)">
             <text x="400" y="-105" fill="#e5e7eb" fontSize={34} fontWeight={900}>
               ZONA ORO — 25 mesas × 12 asientos
             </text>
@@ -540,21 +582,8 @@ function SeatMapSVG({
                       opacity: isBlocked && !sel ? 0.9 : 1,
                     }}
                   >
-                    <circle
-                      cx={s.x}
-                      cy={s.y}
-                      r={26}
-                      fill="transparent"
-                      stroke="none"
-                    />
-                    <circle
-                      cx={s.x}
-                      cy={s.y}
-                      r={18}
-                      fill={fill}
-                      stroke="#111827"
-                      strokeWidth={2}
-                    />
+                    <circle cx={s.x} cy={s.y} r={26} fill="transparent" stroke="none" />
+                    <circle cx={s.x} cy={s.y} r={18} fill={fill} stroke="#111827" strokeWidth={2} />
                     <text
                       x={s.x}
                       y={s.y + 5}
@@ -639,7 +668,7 @@ export default function SeatSelectionPage() {
   }, [eventId, selected]);
 
   // Inyectar mesas al layout
-  type TableGeomLocal = TableGeom; // solo para tipado local
+  type TableGeomLocal = TableGeom;
   const injectTablesIntoLayout = useCallback((tables: TableGeomLocal[]) => {
     setLayout((prev) => {
       if (!prev) return prev;
@@ -660,9 +689,6 @@ export default function SeatSelectionPage() {
         capacity: t.capacity,
         seats: t.seats.map((s) => ({ id: s.id, label: s.label, status: s.status })),
       }));
-
-      
-
 
       return clone;
     });
@@ -711,11 +737,10 @@ export default function SeatSelectionPage() {
     }
 
     console.log("Mesas deshabilitadas", layout?.disabledTables);
-    console.log("Total keys bloqueadas", merged.size); 
+    console.log("Total keys bloqueadas", merged.size);
 
     return merged;
   }, [blockedFromSales, layout]);
-
 
   const selectionItems = useMemo(() => {
     if (!layout)
@@ -723,7 +748,7 @@ export default function SeatSelectionPage() {
         zoneId: string;
         tableId: string;
         seatIds: string[];
-        seatLabels: string[]; // 👈
+        seatLabels: string[];
         unitPrice: number;
       }>;
 

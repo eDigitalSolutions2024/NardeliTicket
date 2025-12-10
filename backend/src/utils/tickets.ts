@@ -225,13 +225,22 @@ export async function ensureMergedTicketsPdf(
   for (const tid of ticketIds) {
     const p = ticketFilePath(tid);
     if (!fs.existsSync(p)) continue;
-    const bytes = fs.readFileSync(p);
-    const src = await PdfLibDocument.load(bytes);
-    const pages = await mergedPdf.copyPages(src, src.getPageIndices());
-    pages.forEach((pg) => mergedPdf.addPage(pg));
+
+    try {
+      const bytes = fs.readFileSync(p);
+      const src = await PdfLibDocument.load(bytes);  // 👈 aquí reventaba
+      const pages = await mergedPdf.copyPages(src, src.getPageIndices());
+      pages.forEach((pg) => mergedPdf.addPage(pg));
+    } catch (err) {
+      console.error("⚠️ PDF individual inválido, se omite:", p, err);
+      // Si quieres, puedes borrar el archivo dañado:
+      // try { fs.unlinkSync(p); } catch {}
+      continue;
+    }
   }
 
   const outBytes = await mergedPdf.save();
   fs.writeFileSync(outPath, outBytes);
   return outPath;
 }
+

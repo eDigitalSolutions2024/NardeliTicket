@@ -375,6 +375,7 @@ function SeatMapSVG({
   onReady,
   blockedKeys,
   disabledTables,
+  isMobile,
 }: {
   selected: Record<string, string[]>;
   onlyAvailable: boolean;
@@ -383,12 +384,13 @@ function SeatMapSVG({
   onPreview: () => void;
   blockedKeys?: Set<string>;
   disabledTables?: Set<string>;
+  isMobile?: boolean;
 }) {
   const tables = useMemo<TableGeom[]>(() => buildTables(), []);
 
   // 👉 detectamos si es mobile (solo en cliente)
-  const isMobile =
-    typeof window !== "undefined" ? window.innerWidth < 768 : false;
+  /*const isMobile =
+    typeof window !== "undefined" ? window.innerWidth < 768 : false;*/
 
   // 👉 valores base distintos para desktop / mobile
   const baseView = isMobile

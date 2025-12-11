@@ -387,33 +387,39 @@ function SeatMapSVG({
 }) {
   const tables = useMemo<TableGeom[]>(() => buildTables(), []);
 
-  // avisamos al padre
-  useEffect(() => {
-    onReady(tables);
-    console.log("SeatMapSVG -> mesas:", tables.length);
-  }, [tables, onReady]);
+  // 👉 detectamos si es mobile (solo en cliente)
+  const isMobile =
+    typeof window !== "undefined" ? window.innerWidth < 768 : false;
 
-  // --- Pan & zoom simples (como antes) ---
-  const [scale, setScale] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  // 👉 valores base distintos para desktop / mobile
+  const baseView = isMobile
+    ? {
+        scale: 1.30,                // un poco más pequeño para que quepa completo
+        offset: { x: 450, y: 0 } // mueve todo un poco hacia la derecha y arriba
+      }
+    : {
+        scale: 1,
+        offset: { x: 450, y: 0 }
+      };
+
+  // Pan/Zoom
+  const [scale, setScale] = useState(baseView.scale);
+  const [offset, setOffset] = useState(baseView.offset);
   const drag = useRef<null | { x: number; y: number }>(null);
+
+  useEffect(() => onReady(tables), [tables, onReady]);
 
   const onWheel = (e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
-    setScale((s) => Math.max(0.5, Math.min(3, s - e.deltaY * 0.0015)));
+    setScale((s) => Math.max(0.4, Math.min(3, s - e.deltaY * 0.0015)));
   };
   const onMouseDown = (e: React.MouseEvent) => {
     drag.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
   };
-  const onMouseUp = () => {
-    drag.current = null;
-  };
+  const onMouseUp = () => (drag.current = null);
   const onMouseMove = (e: React.MouseEvent) => {
     if (!drag.current) return;
-    setOffset({
-      x: e.clientX - drag.current.x,
-      y: e.clientY - drag.current.y,
-    });
+    setOffset({ x: e.clientX - drag.current.x, y: e.clientY - drag.current.y });
   };
 
   const colorBy = (state: SeatStatus | "selected") =>
@@ -431,9 +437,6 @@ function SeatMapSVG({
     const label =
       !isNaN(num) && num >= 1 ? `${zone}-${numToLetter(num)}` : t.id;
 
-    const isVip = t.zoneId === "VIP";
-    const strokeColor = isVip ? "#1e62ff" : "#d4af37";
-
     return (
       <g key={`${t.id}-rect`}>
         <rect
@@ -444,8 +447,8 @@ function SeatMapSVG({
           rx={TABLE_R}
           ry={TABLE_R}
           fill="#e9eef7"
-          stroke={strokeColor}
-          strokeWidth={4}   // borde delgado
+          stroke={t.zoneId === "VIP" ? "#1e62ff" : "#d4af37"}
+          strokeWidth={5}
         />
         <text
           x={t.cx}
@@ -466,13 +469,18 @@ function SeatMapSVG({
   };
 
   return (
-    <div style={{ background: "#0b1220", borderRadius: 12, overflow: "hidden" }}>
+    <div
+      style={{
+        background: "#0b1220",
+        borderRadius: 12,
+        overflow: "hidden",
+      }}
+    >
       <svg
-        // 👇 viewBox fijo que ya funcionaba, solo un poco más compacto
-        viewBox="300 -30 2600 2450"
+        viewBox="300 -30 2600 2750"
         style={{
           width: "100%",
-          height: 720,
+          height: isMobile ? 520 : 1000, // 👉 más compacto en cel
           cursor: drag.current ? "grabbing" : "grab",
         }}
         onWheel={onWheel}
@@ -481,13 +489,20 @@ function SeatMapSVG({
         onMouseMove={onMouseMove}
       >
         <g transform={`translate(${offset.x} ${offset.y}) scale(${scale})`}>
-          {/* ESCENARIO */}
+          {/* Stage */}
           <g transform="translate(-80, 750)">
-            <rect x="-100" y="-190" width="250" height="830" fill="#ffffff" rx="10" />
+            <rect
+              x="-100"
+              y="-190"
+              width="250"
+              height="830"
+              fill="#ffffffff"
+              rx="10"
+            />
             <text
               x="-150"
               y="10"
-              fill="#000000"
+              fill="#000000ff"
               fontSize="90"
               textAnchor="middle"
               transform="rotate(-90 44,0)"
@@ -496,7 +511,6 @@ function SeatMapSVG({
             </text>
           </g>
 
-          {/* MESAS + ASIENTOS */}
           {tables.map((t) => {
             if (disabledTables?.has(t.id)) return null;
 
@@ -557,12 +571,12 @@ function SeatMapSVG({
             );
           })}
 
-          
         </g>
       </svg>
     </div>
   );
 }
+
 
 
 
@@ -573,6 +587,17 @@ export default function SeatSelectionPage() {
   const location = useLocation();
   const { sessionDate, eventName } = (location.state ?? {}) as { sessionDate?: string; eventName?: string };
   const [showPreview, setShowPreview] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => {
+      if (typeof window === "undefined") return;
+      setIsMobile(window.innerWidth < 1024);
+    };
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   useEffect(() => {
     if (!sessionDate && id) navigate(`/events/${id}`, { replace: true });
@@ -762,175 +787,283 @@ export default function SeatSelectionPage() {
 
   if (!layout) return <div style={{ padding: 24 }}>Cargando disposición del evento…</div>;
 
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: 16, padding: 16 }}>
-      {/* LEFT: MAPA */}
-      <div>
-        <header style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700 }}>{layout.eventName}</h1>
-          <Pill>{layout.eventId}</Pill>
-          {sessionDate && (
-            <Pill>
-              {new Date(sessionDate).toLocaleString("es-MX", {
-                dateStyle: "medium",
-                timeStyle: "short",
-              })}
-            </Pill>
-          )}
-          <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <input
-                type="checkbox"
-                checked={onlyAvailable}
-                onChange={(e) => setOnlyAvailable(e.target.checked)}
-              />
-              Mostrar solo disponibles
-            </label>
-            <button
-              onClick={clearSelection}
-              style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid #e5e7eb", background: "white" }}
-            >
-              Limpiar
-            </button>
-          </div>
-        </header>
+if (!layout)
+  return <div style={{ padding: 24 }}>Cargando disposición del evento…</div>;
 
-        <SeatMapSVG
-          selected={selected}
-          onlyAvailable={onlyAvailable}
-          onToggle={handleToggleFromMap}
-          onReady={injectTablesIntoLayout}
-          onPreview={() => setShowPreview(true)}
-          blockedKeys={blockedKeys}
-          disabledTables={disabledTablesSet}
-        />
-      </div>
-
-      {/* RIGHT: CARRITO */}
-      <aside style={{ position: "sticky", top: 16, alignSelf: "start" }}>
+return (
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: isMobile ? "1fr" : "minmax(0, 1.4fr) 360px",
+      gap: isMobile ? 12 : 16,
+      padding: isMobile ? 8 : 16,
+    }}
+  >
+    {/* LEFT: MAPA */}
+    <div>
+      <header
+        style={{
+          display: "flex",
+          flexDirection: isMobile ? "column" : "row",
+          alignItems: isMobile ? "flex-start" : "center",
+          gap: 12,
+          marginBottom: 12,
+        }}
+      >
+        <h1 style={{ fontSize: 22, fontWeight: 700 }}>{layout.eventName}</h1>
+        <Pill>{layout.eventId}</Pill>
+        {sessionDate && (
+          <Pill>
+            {new Date(sessionDate).toLocaleString("es-MX", {
+              dateStyle: "medium",
+              timeStyle: "short",
+            })}
+          </Pill>
+        )}
         <div
           style={{
-            border: "1px solid #e5e7eb",
-            borderRadius: 12,
-            overflow: "hidden",
-            background: "#0b1220",
-            color: "#e5e7eb",
+            marginLeft: isMobile ? 0 : "auto",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            flexWrap: "wrap",
+            marginTop: isMobile ? 8 : 0,
           }}
         >
-          <div style={{ padding: 16, borderBottom: "1px solid #1f2937" }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Tu selección</h3>
-            <small>{totals.seatCount} asiento(s)</small>
-          </div>
+          <label
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
+            <input
+              type="checkbox"
+              checked={onlyAvailable}
+              onChange={(e) => setOnlyAvailable(e.target.checked)}
+            />
+            Mostrar solo disponibles
+          </label>
+          <button
+            onClick={clearSelection}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 8,
+              border: "1px solid #e5e7eb",
+              background: "white",
+            }}
+          >
+            Limpiar
+          </button>
+        </div>
+      </header>
 
-          <div style={{ maxHeight: 280, overflow: "auto" }}>
-            {selectionItems.length === 0 ? (
-              <div style={{ padding: 16, color: "#9ca3af" }}>Aún no has seleccionado asientos.</div>
-            ) : (
-              selectionItems.map((it) => (
-                <div
-                  key={`${it.tableId}`}
-                  style={{
-                    padding: 12,
-                    borderBottom: "1px solid #1f2937",
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: 8,
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600 }}>{it.tableId}</div>
-                    <div style={{ fontSize: 12 }}>Asientos: {it.seatLabels.join(", ")}</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div>{pesos(it.unitPrice * it.seatIds.length, layout.currency)}</div>
-                    <small style={{ color: "#9ca3af" }}>{pesos(it.unitPrice, layout.currency)} c/u</small>
+      <SeatMapSVG
+        selected={selected}
+        onlyAvailable={onlyAvailable}
+        onToggle={handleToggleFromMap}
+        onReady={injectTablesIntoLayout}
+        onPreview={() => setShowPreview(true)}
+        blockedKeys={blockedKeys}
+        disabledTables={disabledTablesSet}
+        isMobile={isMobile}
+      />
+    </div>
+
+    {/* RIGHT: CARRITO */}
+    <aside
+      style={{
+        position: isMobile ? "static" : "sticky",
+        top: isMobile ? undefined : 16,
+        alignSelf: "start",
+        marginTop: isMobile ? 12 : 0,
+      }}
+    >
+      <div
+        style={{
+          border: "1px solid #e5e7eb",
+          borderRadius: 12,
+          overflow: "hidden",
+          background: "#0b1220",
+          color: "#e5e7eb",
+        }}
+      >
+        <div style={{ padding: 16, borderBottom: "1px solid #1f2937" }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
+            Tu selección
+          </h3>
+          <small>{totals.seatCount} asiento(s)</small>
+        </div>
+
+        <div style={{ maxHeight: 280, overflow: "auto" }}>
+          {selectionItems.length === 0 ? (
+            <div style={{ padding: 16, color: "#9ca3af" }}>
+              Aún no has seleccionado asientos.
+            </div>
+          ) : (
+            selectionItems.map((it) => (
+              <div
+                key={`${it.tableId}`}
+                style={{
+                  padding: 12,
+                  borderBottom: "1px solid #1f2937",
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto",
+                  gap: 8,
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600 }}>{it.tableId}</div>
+                  <div style={{ fontSize: 12 }}>
+                    Asientos: {it.seatLabels.join(", ")}
                   </div>
                 </div>
-              ))
-            )}
-          </div>
-
-          <div style={{ padding: 16, borderTop: "1px solid #1f2937" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 6 }}>
-              <span>Subtotal</span>
-              <strong>{pesos(totals.subtotal, layout.currency)}</strong>
-              <span>Tarifa de servicio {layout.feePct ? `(${layout.feePct}%)` : ""}</span>
-              <strong>{pesos(totals.fees, layout.currency)}</strong>
-              <span>Total</span>
-              <strong>{pesos(totals.total, layout.currency)}</strong>
-            </div>
-            {maxReached && (
-              <div style={{ marginTop: 8, color: "#ef4444", fontSize: 12 }}>
-                Excediste el máximo de {layout.maxSeatsPerOrder} asientos por orden. Quita algunos para continuar.
+                <div style={{ textAlign: "right" }}>
+                  <div>
+                    {pesos(
+                      it.unitPrice * it.seatIds.length,
+                      layout.currency
+                    )}
+                  </div>
+                  <small style={{ color: "#9ca3af" }}>
+                    {pesos(it.unitPrice, layout.currency)} c/u
+                  </small>
+                </div>
               </div>
-            )}
-            <button
-              onClick={() => {
-                if (layout.maxSeatsPerOrder && totals.seatCount > (layout.maxSeatsPerOrder ?? Infinity)) return;
-
-                const rawToken = localStorage.getItem("token");
-                const hasToken =
-                  !!rawToken && rawToken !== "undefined" && rawToken !== "null" && rawToken.trim() !== "";
-
-                const payload = {
-                  eventId: layout.eventId,
-                  items: selectionItems,
-                  totals,
-                  sessionDate,
-                };
-
-                if (!hasToken) {
-                  sessionStorage.setItem("NT_PENDING_CHECKOUT", JSON.stringify(payload));
-                  navigate("/auth?tab=login", { state: { redirectTo: "/cart" }, replace: true });
-                  return;
-                }
-
-                navigate("/cart", { state: payload });
-              }}
-              disabled={selectionItems.length === 0 || !!maxReached}
-              style={{
-                width: "100%",
-                marginTop: 12,
-                padding: "10px 14px",
-                borderRadius: 10,
-                background: selectionItems.length === 0 || !!maxReached ? "#374151" : "#22c55e",
-                color: "white",
-                border: "none",
-                fontWeight: 700,
-                cursor: selectionItems.length === 0 || !!maxReached ? "not-allowed" : "pointer",
-              }}
-            >
-              Continuar al pago
-            </button>
-          </div>
+            ))
+          )}
         </div>
 
-        {/* Leyenda */}
+        <div style={{ padding: 16, borderTop: "1px solid #1f2937" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr auto",
+              gap: 6,
+            }}
+          >
+            <span>Subtotal</span>
+            <strong>{pesos(totals.subtotal, layout.currency)}</strong>
+            <span>
+              Tarifa de servicio{" "}
+              {layout.feePct ? `(${layout.feePct}%)` : ""}
+            </span>
+            <strong>{pesos(totals.fees, layout.currency)}</strong>
+            <span>Total</span>
+            <strong>{pesos(totals.total, layout.currency)}</strong>
+          </div>
+          {maxReached && (
+            <div style={{ marginTop: 8, color: "#ef4444", fontSize: 12 }}>
+              Excediste el máximo de {layout.maxSeatsPerOrder} asientos por
+              orden. Quita algunos para continuar.
+            </div>
+          )}
+          <button
+            onClick={() => {
+              if (
+                layout.maxSeatsPerOrder &&
+                totals.seatCount > (layout.maxSeatsPerOrder ?? Infinity)
+              )
+                return;
+
+              const rawToken = localStorage.getItem("token");
+              const hasToken =
+                !!rawToken &&
+                rawToken !== "undefined" &&
+                rawToken !== "null" &&
+                rawToken.trim() !== "";
+
+              const payload = {
+                eventId: layout.eventId,
+                items: selectionItems,
+                totals,
+                sessionDate,
+              };
+
+              if (!hasToken) {
+                sessionStorage.setItem(
+                  "NT_PENDING_CHECKOUT",
+                  JSON.stringify(payload)
+                );
+                navigate("/auth?tab=login", {
+                  state: { redirectTo: "/cart" },
+                  replace: true,
+                });
+                return;
+              }
+
+              navigate("/cart", { state: payload });
+            }}
+            disabled={selectionItems.length === 0 || !!maxReached}
+            style={{
+              width: "100%",
+              marginTop: 12,
+              padding: "10px 14px",
+              borderRadius: 10,
+              background:
+                selectionItems.length === 0 || !!maxReached
+                  ? "#374151"
+                  : "#22c55e",
+              color: "white",
+              border: "none",
+              fontWeight: 700,
+              cursor:
+                selectionItems.length === 0 || !!maxReached
+                  ? "not-allowed"
+                  : "pointer",
+            }}
+          >
+            Continuar al pago
+          </button>
+        </div>
+      </div>
+
+      {/* Leyenda */}
+      <div
+        style={{
+          marginTop: 12,
+          padding: 12,
+          border: "1px solid #e5e7eb",
+          borderRadius: 12,
+          background: "#0b1220",
+          color: "#e5e7eb",
+        }}
+      >
         <div
           style={{
-            marginTop: 12,
-            padding: 12,
-            border: "1px solid #e5e7eb",
-            borderRadius: 12,
-            background: "#0b1220",
-            color: "#e5e7eb",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 6,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <SeatDot state="available" /> <span>Disponible</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <SeatDot state="selected" /> <span>Seleccionado</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <SeatDot state="held" /> <span>En proceso</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <SeatDot state="reserved" /> <span>Reservado</span>
-          </div>
+          <SeatDot state="available" /> <span>Disponible</span>
         </div>
-        {showPreview && <ModalImage src={SALON_IMG} onClose={() => setShowPreview(false)} />}
-      </aside>
-    </div>
-  );
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 6,
+          }}
+        >
+          <SeatDot state="selected" /> <span>Seleccionado</span>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 6,
+          }}
+        >
+          <SeatDot state="held" /> <span>En proceso</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <SeatDot state="reserved" /> <span>Reservado</span>
+        </div>
+      </div>
+      {showPreview && (
+        <ModalImage src={SALON_IMG} onClose={() => setShowPreview(false)} />
+      )}
+    </aside>
+  </div>
+);
+
 }

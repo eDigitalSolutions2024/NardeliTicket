@@ -13,6 +13,19 @@ type LocationState = {
   buyerName?: string;
 };
 
+type ZebraTicketPayload = {
+  eventName: string;
+  dateLabel: string;
+  eventPlace?: string;
+  orderFolio: string;
+  zone: string;
+  tableLabel: string;
+  seatLabels: string[];
+  buyerName: string;
+  priceLabel?: string;
+  ticketCode: string;
+};
+
 function sanitizePhone(input: string): string {
   return (input || "").replace(/\D/g, "");
 }
@@ -69,6 +82,7 @@ export default function CheckoutSuccess() {
   const [sentOkWa, setSentOkWa] = useState<boolean | null>(null);
   const [sendErrWa, setSendErrWa] = useState<string | null>(null);
   const alreadySentRef = useRef(false);
+  const zebraPrintedRef = useRef(false);
 
   // orderId puede venir por state o query (?orderId=?)
   const orderId =
@@ -219,6 +233,42 @@ export default function CheckoutSuccess() {
   }, [orderPdfUrl, orderId]);
 
   const singlePdfUrl = pdfUrls[0] || "";
+
+  async function printLocalCashTicket(payload: ZebraTicketPayload): Promise<void> {
+    try {
+      await fetch("http://localhost:5050/print-cash-ticket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      console.error("No se pudo imprimir en la Zebra local:", err);
+    }
+  }
+
+  // 4) Impresión automática en Zebra SOLO para pago en efectivo (local)
+  useEffect(() => {
+    if (paymentMethod !== "cash") return; // solo efectivo
+    if (!orderId) return; // necesitamos folio
+    if (zebraPrintedRef.current) return; // evitar duplicados
+
+    zebraPrintedRef.current = true;
+
+    const payload: ZebraTicketPayload = {
+      eventName: "NardeliTicket", // luego podemos traer el nombre real del evento
+      dateLabel: new Date().toLocaleString("es-MX"),
+      eventPlace: "", // si quieres luego lo rellenamos con venue
+      orderFolio: orderId,
+      zone: "GENERAL", // por ahora genérico
+      tableLabel: "",
+      seatLabels: [], // si quieres luego mandamos los asientos
+      buyerName: buyerName || "",
+      priceLabel: "", // ejemplo: "$1,000.00 MXN"
+      ticketCode: orderId, // usamos el mismo folio como código
+    };
+
+    void printLocalCashTicket(payload);
+  }, [paymentMethod, orderId, buyerName]);
 
   // Mensaje de WhatsApp: UN SOLO LINK (PDF combinado)
   const messageText = useMemo<string>(() => {

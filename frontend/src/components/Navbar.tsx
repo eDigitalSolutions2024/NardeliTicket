@@ -92,48 +92,65 @@ export default function Navbar() {
         </form>
 
         <div className="nv__right">
-          <Link to="/cart" className="nv__cart" aria-label={`Carrito con ${cartCount} artículos`}>
-            🛒<span className="nv__badge">{cartCount}</span>
-          </Link>
+                  <Link to="/cart" className="nv__cart" aria-label={`Carrito con ${cartCount} artículos`}>
+                    🛒<span className="nv__badge">{cartCount}</span>
+                  </Link>
 
-          {/* ⬇️ FIX: si no hay user, mostramos "Iniciar sesión" (aunque ready sea false) */}
-          {user ? (
-            <div className="nv__user" ref={userMenuRef}>
-              <button
-                className="nv__userbtn"
-                onClick={() => setOpenUserMenu(v => !v)}
-                aria-haspopup="menu"
-                aria-expanded={openUserMenu}
-                title={user?.name || user?.email}
-              >
-                <span className="nv__avatar">{initials}</span>
-                <span className="nv__username">{user?.name || user?.email}</span>
-                <span className="nv__chev">▾</span>
-              </button>
+                  {user ? (
+                    <div className="nv__user" ref={userMenuRef}>
+                      <button
+                        className="nv__userbtn"
+                        onClick={() => setOpenUserMenu(v => !v)}
+                        aria-haspopup="menu"
+                        aria-expanded={openUserMenu}
+                        title={user?.name || user?.email}
+                      >
+                        <span className="nv__avatar">{initials}</span>
+                        <span className="nv__username">{user?.name || user?.email}</span>
+                        <span className="nv__chev">▾</span>
+                      </button>
 
-              {openUserMenu && (
-                <div className="nv__menu" role="menu">
-                  <Link to="/account" role="menuitem" onClick={() => setOpenUserMenu(false)}>Configuración</Link>
-                  {user?.role === "admin" && (
-                    <Link to="/admin" role="menuitem" onClick={() => setOpenUserMenu(false)}>Panel Admin</Link>
+                      {openUserMenu && (
+                        <div className="nv__menu" role="menu">
+                          <Link to="/account" role="menuitem" onClick={() => setOpenUserMenu(false)}>
+                            Configuración
+                          </Link>
+                          {user?.role === "admin" && (
+                            <Link to="/admin" role="menuitem" onClick={() => setOpenUserMenu(false)}>
+                              Panel Admin
+                            </Link>
+                          )}
+                          <button
+                            role="menuitem"
+                            onClick={async () => {
+                              await logout();
+                              setOpenUserMenu(false);
+                              navigate("/");
+                            }}
+                          >
+                            Cerrar sesión
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="nv__guest">
+                      {/* Desktop: botón con texto */}
+                      <Link to="/auth?tab=login" className="nv__login">
+                        Iniciar sesión
+                      </Link>
+
+                      {/* Mobile: solo icono de usuario (se muestra por CSS) */}
+                      <Link
+                        to="/auth?tab=login"
+                        className="nv__login-icon"
+                        aria-label="Iniciar sesión"
+                      >
+                        <span className="nv__avatar">👤</span>
+                      </Link>
+                    </div>
                   )}
-                  <button
-                    role="menuitem"
-                    onClick={async () => {
-                      await logout();
-                      setOpenUserMenu(false);
-                      navigate("/");
-                    }}
-                  >
-                    Cerrar sesión
-                  </button>
                 </div>
-              )}
-            </div>
-          ) : (
-            <Link to="/auth?tab=login" className="nv__login">Iniciar sesión</Link>
-          )}
-        </div>
       </div>
     </header>
   );

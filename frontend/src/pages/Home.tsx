@@ -7,7 +7,7 @@ import { fetchEvents } from "../api/events";
 import "../CSS/Home.css";
 
 // Slides estáticos
-const staticSlides: Slide[] = [
+{/*const staticSlides: Slide[] = [
   {
     image:
       "https://images.unsplash.com/photo-1515165562835-c3b8c2b1d1b4?q=80&w=1600&auto=format&fit=crop",
@@ -29,7 +29,7 @@ const staticSlides: Slide[] = [
     subtitle: "Aprende y conecta con expertos",
     ctaHref: "/events?category=conferencia",
   },
-];
+];*/}
 
 const getNextDate = (ev: EventItem) => {
   const now = Date.now();
@@ -66,7 +66,7 @@ export default function Home() {
         ctaHref: `/evento/${e.id}`,
       }));
 
-    const merged = [...featuredSlides, ...staticSlides];
+    const merged = [...featuredSlides];
     const seen = new Set<string>();
     return merged.filter((s) => {
       const key = `${s.image}|${s.title ?? ""}`;
@@ -86,13 +86,13 @@ export default function Home() {
       .map((x) => x.ev);
   }, [events]);
 
-  const categories = [
+  /*const categories = [
     { key: "Conciertos", label: "Conciertos" },
     { key: "Teatro", label: "Teatro" },
     { key: "Deportes", label: "Deportes" },
     { key: "Familiares", label: "Familiares" },
     { key: "Especiales", label: "Especiales" },
-  ];
+  ];*/
 
   return (
     <main className="home u-container">
@@ -102,7 +102,7 @@ export default function Home() {
       <div className="enhanced-hero__bg-blur" aria-hidden />
 
       {/* Carrusel */}
-      <SimpleCarousel slides={heroSlides} height={420} />
+      <SimpleCarousel slides={heroSlides} height={620} />
 
       {/* Stats flotando arriba */}
       <div className="enhanced-hero__stats top">
@@ -122,7 +122,7 @@ export default function Home() {
     </div>
 
 
-      {/* Categorías (chips) */}
+      {/* Categorías (chips) 
       <section className="home__section">
         <div className="section-header">
           <h2>Explorar por categoría</h2>
@@ -138,7 +138,7 @@ export default function Home() {
             </a>
           ))}
         </div>
-      </section>
+      </section>*/}
 
 {/* Próximos eventos */}
 <section className="home__section">

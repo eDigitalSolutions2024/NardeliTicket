@@ -25,8 +25,8 @@ export type EventLayout = {
   zones: Zone[];
   maxSeatsPerOrder?: number;
   feePct?: number;
-  /** Mesas deshabilitadas configuradas en el panel admin */
   disabledTables?: string[];
+  disabledSeats?: string [];
 };
 
 function ModalImage({
@@ -104,37 +104,44 @@ async function fetchAvailability(eventId: string, eventName?: string): Promise<E
     (ev as any).disabledTables ??
     (ev as any).disbledTables ??
     [];
+  const rawDisabledSeats = 
+    (ev as any).disabledSeats ?? (ev as any).disabledSeats ?? [];
 
-  console.log("Evento desde backend", ev);
-  console.log("Mesas deshabilitadas desde backend", rawDisabled);
 
-  return {
-    eventId: ev.id,
-    eventName: eventName || ev.title || "Evento",
-    currency: "MXN",
-    maxSeatsPerOrder: 12,
-    feePct: 5,
-    zones: [
-      {
-        id: "VIP",
-        name: "VIP",
-        color: "#1e62ff",
-        price: Number(ev.pricing?.vip ?? 0),
-        selectionMode: "seat",
-        tables: [],
-      },
-      {
-        id: "ORO",
-        name: "Zona Oro",
-        color: "#d4af37",
-        price: Number(ev.pricing?.oro ?? 0),
-        selectionMode: "seat",
-        tables: [],
-      },
-    ],
-    disabledTables: rawDisabled,   // 👈 aquí
-  };
-}
+    console.log("Evento desde backend", ev);
+    console.log("Mesas deshabilitadas desde backend", rawDisabled);
+    console.log("Sillas deshabilitadas:", rawDisabledSeats);
+
+    return {
+      eventId: ev.id,
+      eventName: eventName || ev.title || "Evento",
+      currency: "MXN",
+      maxSeatsPerOrder: 12,
+      feePct: 5,
+      zones: [
+        {
+          id: "VIP",
+          name: "VIP",
+          color: "#1e62ff",
+          price: Number(ev.pricing?.vip ?? 0),
+          selectionMode: "seat",
+          tables: [],
+        },
+        {
+          id: "ORO",
+          name: "Zona Oro",
+          color: "#d4af37",
+          price: Number(ev.pricing?.oro ?? 0),
+          selectionMode: "seat",
+          tables: [],
+        },
+      ],
+      disabledTables: rawDisabled,   // 👈 aquí
+      disabledSeats: rawDisabledSeats,
+    };
+  }
+
+  
 
 
 /* ----------------------------- Small UI ----------------------------- */
@@ -183,190 +190,6 @@ function SeatDot({
   );
 }
 
-/* -------------------------- Embedded SVG Map -------------------------- */
-/*const TABLE_W = 190;
-const TABLE_H = 120;
-const TABLE_R = 18;
-
-const STEP_X = 340;
-const STEP_Y = 250;
-
-const VIP_OFFSETS = { topY: -90, bottomY: 90, leftX: -120, rightX: 120 };
-const ORO_OFFSETS = { topY: -90, bottomY: 90, leftX: -120, rightX: 120 };
-
-const makePattern = ({
-  topY,
-  bottomY,
-  leftX,
-  rightX,
-}: {
-  topY: number;
-  bottomY: number;
-  leftX: number;
-  rightX: number;
-}): [number, number][] => [
-  // fila superior: 4 asientos
-  [-54, topY],
-  [-18, topY],
-  [18, topY],
-  [54, topY],
-
-  // fila inferior: 4 asientos
-  [-54, bottomY],
-  [-18, bottomY],
-  [18, bottomY],
-  [54, bottomY],
-
-  // laterales: 1 a cada lado
-  [leftX, 0],
-  [rightX, 0],
-];
-
-
-const SEAT_PATTERN_VIP = makePattern(VIP_OFFSETS);
-const SEAT_PATTERN_ORO = makePattern(ORO_OFFSETS);
-
-const numToLetter = (n: number) =>
-  String.fromCharCode("A".charCodeAt(0) + (n - 1));
-
-type SeatNode = {
-  id: string;
-  label: string;
-  x: number;
-  y: number;
-  status: SeatStatus;
-  zoneId: "VIP" | "ORO";
-  tableId: string;
-};
-type TableGeom = {
-  id: string;
-  name: string;
-  zoneId: "VIP" | "ORO";
-  seats: SeatNode[];
-  capacity: number;
-  cx: number;
-  cy: number;
-};
-
-type TableDef = {
-  id: string;
-  zoneId: "VIP" | "ORO";
-  name: string;
-  cx: number;
-  cy: number;
-};
-
-const TABLE_OFFSETS: Record<string, { dx: number; dy: number }> = {
-  //Asientos VIP
-  "VIP-01": { dx: 100, dy: -50 },
-  "VIP-02": { dx: 50, dy: -50 },
-
-  "VIP-03": { dx: STEP_X * -1.72, dy: 210 },
-  "VIP-04": { dx: 390, dy: -39  },
-
-  "VIP-05": { dx: -245, dy: 190 },
-  "VIP-06": { dx: -290, dy: 190 },
-
-  "VIP-07": { dx: 95, dy: 170 },
-  "VIP-08": { dx: 50, dy: 170 },
-
-  "VIP-09": { dx: -585, dy: 400 },
-  "VIP-10": { dx: 390, dy: 150 },
-
-  "VIP-11": { dx: -245, dy: 380 },
-  "VIP-12": { dx: -290, dy: 380},
-
-
-  "VIP-13": { dx: 95, dy: 360},
-  "VIP-14": { dx: 50, dy: 360 },
-
-  //mesa que no se mostrara
-  "VIP-15": { dx: -175, dy: 10 * STEP_Y },
-
-  //ASIENTOS EN ORO
-  "ORO-01": { dx: -1300, dy: -190 },
-
-
-  "ORO-02": { dx: -1640, dy: 1500 },
-  "ORO-03": { dx: -1980, dy: 1720 },
-  "ORO-04": { dx: -1430, dy: -50 },
-  "ORO-05": { dx: -1770, dy: 210 },
-  "ORO-06": { dx: -410, dy: 190 },
-  "ORO-07": { dx: -750, dy: 420 },
-  "ORO-08": { dx: -1090, dy: 650 },
-  "ORO-09": { dx: -1430, dy: 880 },
-  "ORO-10": { dx: -1770, dy: 1110 },
-
-  "ORO-11": { dx: -120, dy: -550 },
-  "ORO-12": { dx: -460, dy: -290 },
-  "ORO-13": { dx: -800, dy: -60 },
-  "ORO-14": { dx: -1140, dy: 170 },
-  "ORO-15": { dx: -1480, dy: 400 },
-  "ORO-16": { dx: -120, dy: 380 },
-  "ORO-17": { dx: -460, dy: 830 },
-
-  "ORO-18": { dx: -510, dy: -800 },
-  "ORO-19": { dx: -850, dy: -540 },
-  "ORO-20": { dx: -1190, dy: -310 },
-  "ORO-21": { dx: 170, dy: -330 },
-  "ORO-22": { dx: -170, dy: -100 },
-  "ORO-23": { dx: -510, dy: 130 },
-
-  "ORO-24": { dx: 0, dy: 100000000 },
-  "ORO-25": { dx: 0, dy: 1000000 },
-  
-};
-
-const TABLE_DEFS: TableDef[] = (() => {
-  const defs: TableDef[] = [];
-
-  // ----- ZONA VIP (3 x 5) -----
-  const vipOrigin = { x: 260, y: 300 };
-  let tVip = 0;
-  for (let r = 0; r < 5; r++) {
-    for (let c = 0; c < 3; c++) {
-      tVip++;
-      const id = `VIP-${String(tVip).padStart(2, "0")}`;
-
-      // 👇 let para poder sumar el offset
-      let cx = vipOrigin.x + c * STEP_X;
-      let cy = vipOrigin.y + r * STEP_Y;
-
-      const off = TABLE_OFFSETS[id];
-      if (off) {
-        cx += off.dx;
-        cy += off.dy;
-      }
-
-      defs.push({ id, zoneId: "VIP", name: `Mesa VIP ${tVip}`, cx, cy });
-    }
-  }
-
-  // ----- ZONA ORO (5 x 5) -----
-  const oroOrigin = { x: 1350, y: 300 };
-  let tOro = 0;
-  for (let r = 0; r < 5; r++) {
-    for (let c = 0; c < 5; c++) {          // 👈 aquí iba `r++` por error
-      tOro++;
-      const id = `ORO-${String(tOro).padStart(2, "0")}`;
-
-      // 👇 igual: let + suma correcta
-      let cx = oroOrigin.x + c * STEP_X;   // antes estabas asignando con "=" al origin
-      let cy = oroOrigin.y + r * STEP_Y;
-
-      const off = TABLE_OFFSETS[id];
-      if (off) {
-        cx += off.dx;
-        cy += off.dy;
-      }
-
-      defs.push({ id, zoneId: "ORO", name: `Mesa Oro ${tOro}`, cx, cy });
-    }
-  }
-
-  return defs;
-})();*/
-
 
 function SeatMapSVG({
   selected,
@@ -375,6 +198,7 @@ function SeatMapSVG({
   onReady,
   blockedKeys,
   disabledTables,
+  disabledSeatKeys,
   isMobile,
 }: {
   selected: Record<string, string[]>;
@@ -384,15 +208,11 @@ function SeatMapSVG({
   onPreview: () => void;
   blockedKeys?: Set<string>;
   disabledTables?: Set<string>;
+  disabledSeatKeys?: Set<string>;
   isMobile?: boolean;
 }) {
   const tables = useMemo<TableGeom[]>(() => buildTables(), []);
 
-  // 👉 detectamos si es mobile (solo en cliente)
-  /*const isMobile =
-    typeof window !== "undefined" ? window.innerWidth < 768 : false;*/
-
-  // 👉 valores base distintos para desktop / mobile
   const baseView = isMobile
     ? {
         scale: 1.30,                // un poco más pequeño para que quepa completo
@@ -432,7 +252,7 @@ function SeatMapSVG({
       ? "#f59e0b"
       : "#ef4444";
 
-  const renderTableRect = (t: TableGeom) => {
+ /* const renderTableRect = (t: TableGeom) => {
     const [zone, numStr] = t.id.split("-");
     const num = parseInt(numStr, 10);
     const label =
@@ -467,7 +287,7 @@ function SeatMapSVG({
         </text>
       </g>
     );
-  };
+  };*/
 
   return (
     <div
@@ -513,63 +333,100 @@ function SeatMapSVG({
           </g>
 
           {tables.map((t) => {
-            if (disabledTables?.has(t.id)) return null;
+            const isTableDisabled = disabledTables?.has(t.id) ?? false;
+            if (isTableDisabled) return null;
 
             return (
-              <g key={t.id}>
-                {renderTableRect(t)}
-                {t.seats.map((s) => {
-                  const sel = (selected[t.id] || []).includes(s.id);
-                  const key = `${t.id}:${s.id}`;
-                  const isBlocked = blockedKeys?.has(key) ?? false;
-
-                  const visualState = isBlocked
-                    ? "reserved"
-                    : s.status === "available"
-                    ? (sel ? "selected" : "available")
-                    : s.status;
-
-                  const fill = colorBy(visualState as any);
-                  const shouldHide =
-                    onlyAvailable && !sel && visualState === "held";
-                  if (shouldHide) return null;
-
-                  return (
-                    <g
-                      key={s.id}
-                      onClick={() => {
-                        if (isBlocked && !sel) return;
-                        onToggle(t.id, s.id);
-                      }}
-                      style={{
-                        cursor: isBlocked && !sel ? "not-allowed" : "pointer",
-                        opacity: isBlocked && !sel ? 0.9 : 1,
-                      }}
+                <g key={t.id} opacity={isTableDisabled ? 0.8 : 1}>
+                  {/* Mesa */}
+                  <g style={{ pointerEvents: "none" }}>
+                    {/* pinta como disabled si aplica */}
+                    <rect
+                      x={t.cx - TABLE_W / 2}
+                      y={t.cy - TABLE_H / 2}
+                      width={TABLE_W}
+                      height={TABLE_H}
+                      rx={TABLE_R}
+                      ry={TABLE_R}
+                      fill={isTableDisabled ? "#111827" : "#e9eef7"}
+                      stroke={
+                        isTableDisabled
+                          ? "#ef4444"
+                          : t.zoneId === "VIP"
+                          ? "#1e62ff"
+                          : "#d4af37"
+                      }
+                      strokeWidth={isTableDisabled ? 7 : 5}
+                    />
+                    <text
+                      x={t.cx}
+                      y={t.cy + 8}
+                      fontSize={30}
+                      textAnchor="middle"
+                      fill={isTableDisabled ? "#fca5a5" : "#334155"}
+                      style={{ fontWeight: 900, letterSpacing: 0.6 }}
                     >
-                      <circle cx={s.x} cy={s.y} r={26} fill="transparent" />
-                      <circle
-                        cx={s.x}
-                        cy={s.y}
-                        r={18}
-                        fill={fill}
-                        stroke="#111827"
-                        strokeWidth={2}
-                      />
-                      <text
-                        x={s.x}
-                        y={s.y + 5}
-                        textAnchor="middle"
-                        fontSize={12}
-                        fill="#0b1220"
-                        style={{ pointerEvents: "none", fontWeight: 700 }}
+                      {(() => {
+                        const [zone, numStr] = t.id.split("-");
+                        const num = parseInt(numStr, 10);
+                        return !isNaN(num) && num >= 1 ? `${zone}-${numToLetter(num)}` : t.id;
+                      })()}
+                    </text>
+                  </g>
+
+                  {/* Sillas */}
+                  {t.seats.map((s) => {
+                    const sel = (selected[t.id] || []).includes(s.id);
+                    const key = `${t.id}:${s.id}`;
+                    const isBlocked = blockedKeys?.has(key) ?? false;
+                    const isAdminSeatDisabled = disabledSeatKeys?.has(key) ?? false;
+                    if (isAdminSeatDisabled) return null;
+
+                    // 👇 si la mesa está deshabilitada, tratamos todas sus sillas como bloqueadas
+                    const trulyBlocked = isTableDisabled || isBlocked;
+
+                    const visualState = trulyBlocked
+                      ? "reserved"
+                      : s.status === "available"
+                      ? sel
+                        ? "selected"
+                        : "available"
+                      : s.status;
+
+                    const fill = colorBy(visualState as any);
+
+                    const shouldHide = onlyAvailable && !sel && visualState === "held";
+                    if (shouldHide) return null;
+
+                    return (
+                      <g
+                        key={s.id}
+                        onClick={() => {
+                          if (trulyBlocked && !sel) return; // 👈 no permitir click si está bloqueado (o mesa disabled)
+                          onToggle(t.id, s.id);
+                        }}
+                        style={{
+                          cursor: trulyBlocked && !sel ? "not-allowed" : "pointer",
+                          opacity: trulyBlocked && !sel ? 0.9 : 1,
+                        }}
                       >
-                        {s.label}
-                      </text>
-                    </g>
-                  );
-                })}
-              </g>
-            );
+                        <circle cx={s.x} cy={s.y} r={26} fill="transparent" />
+                        <circle cx={s.x} cy={s.y} r={18} fill={fill} stroke="#111827" strokeWidth={2} />
+                        <text
+                          x={s.x}
+                          y={s.y + 5}
+                          textAnchor="middle"
+                          fontSize={12}
+                          fill="#0b1220"
+                          style={{ pointerEvents: "none", fontWeight: 700 }}
+                        >
+                          {s.label}
+                        </text>
+                      </g>
+                    );
+                  })}
+                </g>
+              );
           })}
 
         </g>
@@ -663,10 +520,6 @@ export default function SeatSelectionPage() {
         capacity: t.capacity,
         seats: t.seats.map((s) => ({ id: s.id, label: s.label, status: s.status })),
       }));
-
-      
-
-
       return clone;
     });
   }, []);
@@ -700,24 +553,14 @@ export default function SeatSelectionPage() {
   const blockedKeys = useMemo(() => {
     const merged = new Set<string>(blockedFromSales);
 
-    if (layout?.disabledTables && layout.zones?.length) {
-      const disabledSet = new Set(layout.disabledTables);
-      layout.zones.forEach((z) => {
-        z.tables.forEach((t) => {
-          if (disabledSet.has(t.id)) {
-            t.seats.forEach((s) => {
-              merged.add(`${t.id}:${s.id}`);
-            });
-          }
-        });
+    if (layout?.disabledSeats?.length) {
+      layout.disabledSeats.forEach((key) => {
+        merged.add(key);
       });
     }
-
-    console.log("Mesas deshabilitadas", layout?.disabledTables);
-    console.log("Total keys bloqueadas", merged.size); 
-
+    
     return merged;
-  }, [blockedFromSales, layout]);
+  }, [blockedFromSales, layout?.disabledSeats]);
 
 
   const selectionItems = useMemo(() => {
@@ -769,6 +612,44 @@ export default function SeatSelectionPage() {
     if (!layout?.disabledTables) return new Set<string>();
     return new Set(layout.disabledTables);
   }, [layout?.disabledTables]);
+
+  const disabledSeatKeysSet = useMemo(() => {
+    return new Set<string>(layout?.disabledSeats ?? []);
+  },[layout?.disabledSeats]);
+
+  useEffect(() => {
+    console.log("Admin disabledTables:", layout?.disabledTables);
+    console.log("Admin disabledSeats:", layout?.disabledSeats?.slice(0, 10), "… total:", layout?.disabledSeats?.length ?? 0);
+  }, [layout?.disabledTables, layout?.disabledSeats]);
+
+  useEffect(() => {
+  if (!layout) return;
+
+  setSelected((prev) => {
+    let changed = false;
+    const next: Record<string, string[]> = {};
+
+    for (const [tableId, seatIds] of Object.entries(prev)) {
+      // Si la mesa fue deshabilitada por admin -> elimina toda selección de esa mesa
+      if (disabledTablesSet.has(tableId)) {
+        changed = true;
+        continue;
+      }
+
+      // Filtra sillas que ahora estén deshabilitadas o bloqueadas
+      const filtered = seatIds.filter((seatId) => {
+        const key = `${tableId}:${seatId}`;
+        return !disabledSeatKeysSet.has(key) && !blockedKeys.has(key);
+      });
+
+      if (filtered.length !== seatIds.length) changed = true;
+      if (filtered.length) next[tableId] = filtered;
+    }
+
+    return changed ? next : prev;
+  });
+}, [layout, disabledTablesSet, disabledSeatKeysSet, blockedKeys]);
+
 
   const maxReached =
     layout?.maxSeatsPerOrder && totals.seatCount > (layout.maxSeatsPerOrder ?? Infinity);
@@ -863,6 +744,7 @@ return (
         onPreview={() => setShowPreview(true)}
         blockedKeys={blockedKeys}
         disabledTables={disabledTablesSet}
+        disabledSeatKeys={disabledSeatKeysSet}
         isMobile={isMobile}
       />
     </div>

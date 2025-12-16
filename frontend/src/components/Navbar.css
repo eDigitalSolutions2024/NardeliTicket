@@ -4,6 +4,8 @@
   z-index: 50;
   background: #0f172a;
   color: #fff;
+  overflow-x: clip;
+  width: 100%;
 }
 
 .nv__inner {
@@ -13,6 +15,7 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  min-width: 0;
 }
 
 /* LEFT -------------------------------------------------------- */
@@ -21,6 +24,7 @@
   align-items: center;
   gap: 0.75rem;
   flex: 1;
+   min-width: 0;
 }
 
 .nv__brand {
@@ -215,6 +219,23 @@
   color: inherit;
 }
 
+.nv__left,
+.nv__search,
+.nv__right {
+  min-width: 0;
+}
+
+.nv__search input {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.nv__search button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+
 /* Mobile ------------------------------------------------------ */
 @media (max-width: 900px) {
   .nv__inner {
@@ -223,7 +244,7 @@
   }
 
   .nv__left {
-    flex: 1;
+    flex: 1 1 auto; min-width: 0;
   }
 
   .nv__burger {
@@ -254,8 +275,7 @@
 
   /* lado derecho más compacto */
   .nv__right {
-    gap: 0.5rem;
-    margin-left: auto;
+   min-width: 0;
   }
 
   /* usuario: solo avatar (icono), sin nombre ni flecha */

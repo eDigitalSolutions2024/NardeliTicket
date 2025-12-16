@@ -48,6 +48,7 @@ const emptyForm: FormState = {
   featured: false,
   pricing: { vip: 0, oro: 0 },
   disabledTables: [],
+  disabledSeats: [],
 };
 
 /* ==== utils fechas ==== */
@@ -198,6 +199,7 @@ export default function AdminDashboard() {
           oro: Number(form.pricing?.oro ?? 0),
         },
         disabledTables: form.disabledTables ?? [],
+        disabledSeats: (form as any).disabledSeats ?? [],
       };
 
       if (isEditing && form.id) {
@@ -235,6 +237,7 @@ export default function AdminDashboard() {
       featured: Boolean(ev.featured),
       pricing: { vip: ev.pricing?.vip ?? 0, oro: ev.pricing?.oro ?? 0 },
       disabledTables: ev.disabledTables ?? [],
+      disabledSeats: (ev as any).disabledSeats ?? [],
       createdAt: ev.createdAt,
     });
     setSessionInput("");
@@ -499,7 +502,7 @@ export default function AdminDashboard() {
                   className="btn-secondary"
                   onClick={() => setShowLayoutModal(true)}
                 >
-                  Configurar layout (mesas)
+                  Configurar layout (mesas y sillas)
                 </button>
                 {form.disabledTables && form.disabledTables.length > 0 ? (
                   <small style={{ color: "#374151" }}>
@@ -510,6 +513,14 @@ export default function AdminDashboard() {
                   <small style={{ color: "#6b7280" }}>
                     No hay mesas deshabilitadas.
                   </small>
+                )}
+                
+                {form.disabledSeats && form.disabledSeats.length > 0 ? (
+                  <small style={{ color: "#374151" }}>
+                    Sillas deshabilitadas: <strong>{form.disabledSeats.length}</strong>
+                  </small>
+                ) : (
+                  <small style={{ color: "#6b7280" }}>No hay sillas deshabilitadas.</small>
                 )}
               </div>
             </div>
@@ -687,7 +698,11 @@ export default function AdminDashboard() {
           {showLayoutModal && (
             <LayoutEditorModal
               disabledTables={form.disabledTables ?? []}
-              onChange={(next) => setField("disabledTables", next)}
+              disabledSeats={form.disabledSeats ?? []}
+              onChange={(next) => {
+                setField("disabledTables", next.disabledTables);
+                setField("disabledSeats", next.disabledSeats);
+              }}
               onClose={() => setShowLayoutModal(false)}
             />
           )}
@@ -1035,18 +1050,16 @@ function SalesTab({ events }: { events: EventItem[] }) {
   );
 }
 
-/* =========================
-   Modal para configurar layout
-   ========================= */
-
 type LayoutEditorModalProps = {
   disabledTables: string[];
-  onChange: (next: string[]) => void;
+  disabledSeats: string[];
+  onChange: (next: { disabledTables: string[]; disabledSeats: string[] }) => void;
   onClose: () => void;
 };
 
 function LayoutEditorModal({
   disabledTables,
+  disabledSeats,
   onChange,
   onClose,
 }: LayoutEditorModalProps) {
@@ -1119,21 +1132,40 @@ const TABLE_R_MODAL = TABLE_R * TABLE_SCALE;
   }, [tables]);
 
 
-  const [localDisabled, setLocalDisabled] = useState<Set<string>>(
-    () => new Set(disabledTables)
-  );
+  const [mode, setMode] = useState<"tables" | "seats">("tables");
 
-  const toggleTable = (id: string) => {
-    setLocalDisabled((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+const [localDisabledTables, setLocalDisabledTables] = useState<Set<string>>(
+  () => new Set(disabledTables)
+);
+
+const [localDisabledSeats, setLocalDisabledSeats] = useState<Set<string>>(
+  () => new Set(disabledSeats)
+);
+
+const toggleTable = (id: string) => {
+  setLocalDisabledTables((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
+};
+
+const toggleSeat = (tableId: string, seatId: string) => {
+  const key = `${tableId}:${seatId}`;
+  setLocalDisabledSeats((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    return next;
+  });
+};
 
   const handleSave = () => {
-    onChange(Array.from(localDisabled));
+    onChange({
+      disabledTables: Array.from(localDisabledTables),
+      disabledSeats: Array.from(localDisabledSeats),
+    });
     onClose();
   };
 
@@ -1177,8 +1209,48 @@ const TABLE_R_MODAL = TABLE_R * TABLE_SCALE;
             Configurar layout del evento
           </h2>
           <span style={{ fontSize: 12, color: "#9ca3af" }}>
-            Haz clic en una mesa para habilitarla o deshabilitarla.
+            {mode === "tables"
+              ? "Haz clic en una mesa para habilitarla o deshabilitarla."
+              : "Haz clic en una silla para habilitarla o deshabilitarla."}
           </span>
+
+          <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+            <button
+              type="button"
+              onClick={() => setMode("tables")}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 999,
+                border: "1px solid #374151",
+                background: mode === "tables" ? "#22c55e" : "#111827",
+                color: mode === "tables" ? "#0b1120" : "#e5e7eb",
+                cursor: "pointer",
+                fontWeight: 700,
+                fontSize: 12,
+              }}
+            >
+              Mesas
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setMode("seats")}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 999,
+                border: "1px solid #374151",
+                background: mode === "seats" ? "#22c55e" : "#111827",
+                color: mode === "seats" ? "#0b1120" : "#e5e7eb",
+                cursor: "pointer",
+                fontWeight: 700,
+                fontSize: 12,
+              }}
+            >
+              Sillas
+            </button>
+          </div>
+
+
           <button
             onClick={onClose}
             style={{
@@ -1207,126 +1279,93 @@ const TABLE_R_MODAL = TABLE_R * TABLE_SCALE;
               ESCENARIO
             </text>
           </g>
-
-            {/* Marcos zona VIP / ORO 
-            <rect
-              x="100"
-              y="120"
-              width="1025"
-              height="1400"
-              fill="none"
-              stroke="#1e62ff"
-              strokeWidth={14}
-              rx={20}
-            />
-            <g transform="translate(140, 205)">
-              <text
-                x="200"
-                y="-105"
-                fill="#e5e7eb"
-                fontSize={34}
-                fontWeight={900}
-              >
-                ZONA VIP — 15 mesas
-              </text>
-            </g>
-
-            <rect
-              x="1150"
-              y="120"
-              width="1800"
-              height="1400"
-              fill="none"
-              stroke="#d4af37"
-              strokeWidth={14}
-              rx={20}
-            />
-            <g transform="translate(1420, 205)">
-              <text
-                x="400"
-                y="-105"
-                fill="#e5e7eb"
-                fontSize={34}
-                fontWeight={900}
-              >
-                ZONA ORO — 25 mesas
-              </text>
-            </g> /*}
-
             {/* Mesas */}
             {tables.map((t) => {
-              const isDisabled = localDisabled.has(t.id);
+              const isTableDisabled = localDisabledTables.has(t.id);
               const strokeBase = t.zoneId === "VIP" ? "#1e62ff" : "#d4af37";
 
               return (
-                <g
-                  key={t.id}
-                  onClick={() => toggleTable(t.id)}
-                  style={{ cursor: "pointer" }}
-                >
-                  <rect
-                    x={t.cx - TABLE_W_MODAL / 2}
-                    y={t.cy - TABLE_H_MODAL / 2}
-                    width={TABLE_W_MODAL}
-                    height={TABLE_H_MODAL}
-                    rx={TABLE_R_MODAL}
-                    ry={TABLE_R_MODAL}
-                    fill={isDisabled ? "#111827" : "#e9eef7"}
-                    stroke={isDisabled ? "#ef4444" : strokeBase}
-                    strokeWidth={isDisabled ? 6 : 3}
-                    opacity={isDisabled ? 0.75 : 1}
-                  />
-                  <text
-                    x={t.cx}
-                    y={t.cy + 10}
-                    fontSize={30 * TABLE_SCALE}  // texto un poco más grande
-                    textAnchor="middle"
-                    fill={isDisabled ? "#fca5a5" : "#334155"}
-                    style={{
-                      pointerEvents: "none",
-                      fontWeight: 900,
-                      letterSpacing: 0.6,
-                    }}
+                <g key={t.id}>
+                  {/* Mesa (siempre visible) */}
+                  <g
+                    onClick={mode === "tables" ? () => toggleTable(t.id) : undefined}
+                    style={{ cursor: mode === "tables" ? "pointer" : "default" }}
                   >
-                    {t.label}
-                  </text>
+                    <rect
+                      x={t.cx - TABLE_W_MODAL / 2}
+                      y={t.cy - TABLE_H_MODAL / 2}
+                      width={TABLE_W_MODAL}
+                      height={TABLE_H_MODAL}
+                      rx={TABLE_R_MODAL}
+                      ry={TABLE_R_MODAL}
+                      fill={isTableDisabled ? "#111827" : "#e9eef7"}
+                      stroke={isTableDisabled ? "#ef4444" : strokeBase}
+                      strokeWidth={isTableDisabled ? 6 : 3}
+                      opacity={isTableDisabled ? 0.75 : 1}
+                    />
+                    <text
+                      x={t.cx}
+                      y={t.cy + 10}
+                      fontSize={30 * TABLE_SCALE}
+                      textAnchor="middle"
+                      fill={isTableDisabled ? "#fca5a5" : "#334155"}
+                      style={{ pointerEvents: "none", fontWeight: 900, letterSpacing: 0.6 }}
+                    >
+                      {t.label}
+                    </text>
+                  </g>
+
+                  {/* Sillas (solo en modo seats) */}
+                  {mode === "seats" &&
+                    (() => {
+                      // Necesitamos la mesa completa con seats reales
+                      const full = buildTables().find((x) => x.id === t.id);
+                      if (!full) return null;
+
+                      return full.seats.map((s) => {
+                        const key = `${t.id}:${s.id}`;
+                        const isSeatDisabled = localDisabledSeats.has(key);
+
+                        // si la mesa está deshabilitada, bloqueamos click de sillas (recomendado)
+                        const canClick = !isTableDisabled;
+
+                        return (
+                          <g
+                            key={key}
+                            onClick={
+                              canClick ? () => toggleSeat(t.id, s.id) : undefined
+                            }
+                            style={{
+                              cursor: canClick ? "pointer" : "not-allowed",
+                              opacity: canClick ? 1 : 0.5,
+                            }}
+                          >
+                            <circle cx={s.x} cy={s.y} r={22} fill="transparent" />
+                            <circle
+                              cx={s.x}
+                              cy={s.y}
+                              r={14}
+                              fill={isSeatDisabled ? "#ef4444" : "#9ca3af"}
+                              stroke="#111827"
+                              strokeWidth={2}
+                            />
+                            <text
+                              x={s.x}
+                              y={s.y + 4}
+                              textAnchor="middle"
+                              fontSize={10}
+                              fill="#0b1220"
+                              style={{ pointerEvents: "none", fontWeight: 700 }}
+                            >
+                              {s.label}
+                            </text>
+                          </g>
+                        );
+                      });
+                    })()}
                 </g>
               );
             })}
-
-            {/* Leyenda 
-            <g transform="translate(140, 1560)">
-              <rect
-                x="0"
-                y="-34"
-                width="720"
-                height="52"
-                fill="#0f1629"
-                rx="12"
-              />
-              <line
-                x1="20"
-                y1="-10"
-                x2="80"
-                y2="-10"
-                stroke="#22c55e"
-                strokeWidth={10}
-              />
-              <text x="92" y="-3" fill="#e5e7eb" fontSize={18}>
-                Mesa habilitada (a la venta)
-              </text>
-              <line
-                x1="360"
-                y1="-10"
-                x2="420"
-                y2="-10"
-                stroke="#ef4444"
-                strokeWidth={10}
-              />
-              <text x="432" y="-3" fill="#e5e7eb" fontSize={18}>
-                Mesa deshabilitada
-              </text>
-            </g> */}
           </svg>
         </div>
 
@@ -1341,14 +1380,16 @@ const TABLE_R_MODAL = TABLE_R * TABLE_SCALE;
           }}
         >
           <div style={{ fontSize: 13, color: "#9ca3af" }}>
-            Mesas deshabilitadas:{" "}
-            {localDisabled.size
-              ? Array.from(localDisabled).join(", ")
-              : "ninguna"}
+            Mesas: {localDisabledTables.size ? localDisabledTables.size : 0} |{" "}
+            Sillas: {localDisabledSeats.size ? localDisabledSeats.size : 0}
           </div>
+
           <div style={{ display: "flex", gap: 8 }}>
             <button
-              onClick={() => setLocalDisabled(new Set())}
+              onClick={() => {
+                if (mode === "tables") setLocalDisabledTables(new Set());
+                else setLocalDisabledSeats(new Set());
+              }}
               style={{
                 padding: "6px 12px",
                 borderRadius: 8,

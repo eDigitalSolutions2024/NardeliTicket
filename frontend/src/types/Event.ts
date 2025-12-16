@@ -19,4 +19,5 @@ export interface EventItem {
   pricing?: TicketPricing;
   createdAt?: string;
   disabledTables?: string[];
+  disabledSeats?: string[];
 }

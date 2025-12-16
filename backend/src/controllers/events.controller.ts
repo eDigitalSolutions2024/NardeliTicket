@@ -47,7 +47,8 @@ export async function createEvent(req: Request, res: Response) {
       status,           // ⬅️ NUEVO
       featured,         // ⬅️ NUEVO
       pricing,
-      disabledTables,           // ⬅️ NUEVO { vip, oro }
+      disabledTables, 
+      disabledSeats,
     } = req.body || {};
 
     if (!title || !venue || !city || !imageUrl) {
@@ -66,6 +67,10 @@ export async function createEvent(req: Request, res: Response) {
 
     const normalizedDisabledTables: string[] = Array.isArray(disabledTables)
     ? disabledTables.map((t: any) => String(t)) : [];
+
+    const normalizedDisabledSeats: string[] = Array.isArray(disabledSeats)
+      ? disabledSeats.map((s: any) => String(s)).filter(Boolean)
+      : [];
 
     const ev = await Event.create({
       title,
@@ -98,6 +103,8 @@ export async function updateEvent(req: Request, res: Response) {
       featured,         // ⬅️ NUEVO
       pricing,
       disabledTables,           // ⬅️ NUEVO { vip, oro }
+      disabledSeats,
+      
     } = req.body || {};
 
     const update: any = {};
@@ -123,6 +130,13 @@ export async function updateEvent(req: Request, res: Response) {
     if (disabledTables !== undefined){
       update.disabledTables = Array.isArray(disabledTables) ? disabledTables.map((t: any) => String(t)) : [];
     }
+
+    if (disabledSeats !== undefined) {
+      update.disabledSeats = Array.isArray(disabledSeats)
+        ? disabledSeats.map((s: any) => String(s)).filter(Boolean)
+        : [];
+    }
+
 
     const ev = await Event.findByIdAndUpdate(id, update, { new: true, runValidators: true, upsert: false });
     if (!ev) return res.status(404).json({ error: "Event not found" });

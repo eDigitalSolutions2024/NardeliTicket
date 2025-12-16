@@ -12,11 +12,47 @@
 }
 
 /* ----- Layout general ----- */
-.acc-wrap {
+
+.acc-wrap { 
   max-width: 1000px;
   margin: 32px auto 56px;
   padding: 0 20px;
+  overflow-x: hidden; /* ✅ mata el scroll horizontal */
 }
+
+.acc-title {
+  flex-wrap: wrap;    /* ✅ el título ya puede bajar de línea */
+  min-width: 0;
+}
+
+.acc-wrap .chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  color: #fff;
+  font-weight: 800;
+  box-shadow: var(--shadow);
+  font-size: 1rem;
+  padding: 0;              /* 👈 importante (por si global mete padding) */
+}
+
+.acc-wrap .btn {
+  appearance: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter .15s ease, transform .02s ease, box-shadow .15s ease;
+}
+
+.acc-wrap .btn-primary { /* igual que antes */ }
+.acc-wrap .btn-outline { /* igual que antes */ }
+
 
 /* ----- Títulos ----- */
 .acc-title { 
@@ -43,6 +79,7 @@
   box-shadow: var(--shadow);
   padding: 24px;
   margin-top: 24px;
+  overflow: hidden;
 }
 .acc-card h3 {
   margin: 0 0 16px;
@@ -87,7 +124,7 @@
 .acc-grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .acc-grid.cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 
-@media (max-width: 920px) {
+@media (max-width: 768px) {
   .acc-grid.cols-2, 
   .acc-grid.cols-3 { grid-template-columns: 1fr; }
 }
@@ -108,6 +145,7 @@
   font-size: 1rem;
   outline: none;
   transition: border .15s ease, box-shadow .15s ease, background .15s ease;
+  min-width: 0;
 }
 .acc-field input:focus {
   border-color: var(--focus);
@@ -139,6 +177,8 @@
   margin-top: 16px; 
   display: flex; 
   gap: 12px; 
+  flex-wrap: wrap;
+  align-items: center;
 }
 .btn {
   appearance: none;
@@ -165,11 +205,6 @@
   border: 1px solid var(--brand);
 }
 .btn-outline:hover { filter: brightness(1.05); }
-
-/* ==== Ajustes finos para NardeliTicket ==== */
-
-/* Si el navbar es fixed/sticky y tapa el título, descomenta: */
-/* .acc-wrap { padding-top: 72px; }  */
 
 /* Encabezados de tarjeta más notorios */
 .acc-card h3 {
@@ -226,7 +261,163 @@
 .acc-card { animation: accFadeIn .18s ease-out; }
 
 /* Compacta en móviles muy chicos */
-@media (max-width: 380px) {
-  .btn { width: 100%; text-align: center; }
-  .acc-actions { flex-direction: column; }
+@media (max-width: 639px) {
+  .acc-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .acc-actions .btn {
+    width: 100%;
+  }
+}
+
+/* FIX: en móvil, los botones deben ir en columna para no romper el ancho */
+@media (max-width: 639px) {
+  .acc-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .acc-actions .btn {
+    width: 100%;
+  }
+}
+
+/* =========================
+   TABLE: Mis compras/boletos
+   ========================= */
+
+/* IMPORTANTE:
+   Tu .acc-wrap tiene overflow-x:hidden.
+   Eso corta cualquier cosa que quiera scrollear.
+   Aquí lo neutralizamos solo para esta pantalla. 
+.acc-wrap {
+  overflow-x: visible; 
+}*/
+
+/* Wrapper con scroll horizontal SOLO para la tabla */
+.acc-table-wrapper {
+  width: 100%;
+  overflow-x: auto;               /* ✅ scroll horizontal en móvil */
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+/* Tabla legible y con ancho mínimo (para que no se aplaste) */
+.acc-table {
+  width: 100%;
+  min-width: 980px;               /* ✅ evita que 9 columnas se compriman */
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+/* Encabezado */
+.acc-table thead th {
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--muted);
+  background: #f3f6fb;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 12px;
+  white-space: nowrap;
+}
+
+/* Celdas */
+.acc-table tbody td {
+  padding: 12px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink);
+  font-size: 0.92rem;
+  vertical-align: top;
+  white-space: nowrap;            /* ✅ mantiene columnas compactas */
+}
+
+/* Última fila sin borde */
+.acc-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Hover suave */
+.acc-table tbody tr:hover td {
+  background: rgba(12, 60, 115, 0.04);
+}
+
+/* Link tipo botón */
+.btn-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--brand);
+  font-weight: 800;
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(12, 60, 115, 0.25);
+  background: rgba(12, 60, 115, 0.06);
+  transition: filter .15s ease, transform .02s ease, background .15s ease;
+}
+.btn-link:hover {
+  background: rgba(12, 60, 115, 0.10);
+  filter: brightness(1.02);
+}
+.btn-link:active { transform: translateY(1px); }
+
+/* Badge estado */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 0.78rem;
+  line-height: 1;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+/* Estados comunes (ajusta si tus strings cambian) */
+.status--paid {
+  color: #065f46;
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.25);
+}
+.status--pending_payment,
+.status--pending {
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.28);
+}
+.status--refunded,
+.status--canceled,
+.status--cancelled,
+.status--failed {
+  color: #991b1b;
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+/* =========================
+   Mobile polish
+   ========================= */
+@media (max-width: 639px) {
+  .acc-wrap {
+    margin: 18px auto 44px;
+    padding: 0 14px;
+  }
+
+  .acc-title {
+    font-size: 1.35rem;
+    gap: 10px;
+  }
+
+  .acc-card {
+    padding: 16px;
+  }
+
+  /* En móvil deja que el wrapper scrollee cómodo */
+  .acc-table-wrapper {
+    border-radius: 12px;
+  }
 }

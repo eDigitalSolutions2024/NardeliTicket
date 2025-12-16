@@ -31,16 +31,16 @@ const EventSchema = new Schema(
     imageUrl: { type: String, required: true },
     category: { type: String, enum: ["Conciertos","Teatro","Deportes","Familiares","Especiales"] },
     sessions: { type: [SessionSchema], default: [] },
-
-    // Si agregaste estos campos en tu UI:
     status:   { type: String, enum: ["draft","published"], default: "draft" },
     featured: { type: Boolean, default: false },
-    // 👇 NUEVO
     pricing: { type: PricingSchema, default: () => ({ vip: 0, oro: 0 }) },
     pricingCents: { type: PricingCentsSchema, default: () => ({ vip: 0, oro: 0}) },
     layoutVersion: { type: Number, default: 1 },
-
     disabledTables: {
+      type: [String],
+      default: [],
+    },
+    disabledSeats: {
       type: [String],
       default: [],
     },

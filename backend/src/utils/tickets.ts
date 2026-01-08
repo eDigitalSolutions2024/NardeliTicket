@@ -135,19 +135,23 @@ export async function ensureTicketPdf({
     const cardY = 18 + headerH + 10;
     const cardX = 18;
     const cardW = doc.page.width - 36;
-    const cardH = 180;
-
+    const cardH = 190; // un poquito más alto para texto
     doc
       .roundedRect(cardX, cardY, cardW, cardH, 10)
       .lineWidth(1.2)
       .strokeColor(BORDER)
       .stroke();
 
+    // Título del evento
     doc
       .fillColor("#111827")
       .fontSize(14)
-      .text(eventName, cardX + 12, cardY + 10, { width: cardW - 24, align: "left" });
+      .text(eventName, cardX + 12, cardY + 10, {
+        width: cardW - 24,
+        align: "left",
+      });
 
+    // Separador
     doc
       .moveTo(cardX + 12, cardY + 34)
       .lineTo(cardX + cardW - 12, cardY + 34)
@@ -155,53 +159,85 @@ export async function ensureTicketPdf({
       .strokeColor(BORDER)
       .stroke();
 
+    // --- Layout de columnas dinámicas ---
     const leftX = cardX + 12;
     const rightX = cardX + cardW / 2;
+    const colWidth = (cardW - 24) / 2 - 4; // ancho de cada columna
     let y = cardY + 44;
 
-    const row = (label: string, value: string, x: number) => {
-      doc.fillColor(GRAY).fontSize(9).text(label, x, y);
-      doc.fillColor("#111827").fontSize(11).text(value || "-", x, y + 12);
-    };
+    // Dibuja un label + valor y devuelve la altura usada
+    function drawField(
+      label: string,
+      value: string | undefined,
+      x: number,
+      yPos: number
+    ) {
+      const txt = value || "-";
 
-    row("Fecha", fmtDate(eventDate), leftX);
-    row("Lugar", eventPlace || "-", rightX);
+      // Label
+      doc.fillColor(GRAY).fontSize(9).text(label, x, yPos, {
+        width: colWidth,
+      });
+      const labelH = doc.heightOfString(label, { width: colWidth });
 
-    y += 36;
-    row("Zona", String(zona), leftX);
-    row("Mesa", String(mesa), rightX);
+      // Valor
+      doc
+        .fillColor("#111827")
+        .fontSize(11)
+        .text(txt, x, yPos + labelH + 1, {
+          width: colWidth,
+        });
+      const valueH = doc.heightOfString(txt, { width: colWidth });
 
-    y += 36;
-    row("Asiento", String(asiento), leftX);
-    row("Precio", money(typeof precio === "number" ? precio : undefined), rightX);
+      return labelH + 1 + valueH;
+    }
 
+    // Dibuja una fila de hasta 2 columnas y aumenta "y"
+    function twoColsRow(
+      labelLeft: string,
+      valueLeft: string | undefined,
+      labelRight?: string,
+      valueRight?: string
+    ) {
+      const hLeft = drawField(labelLeft, valueLeft, leftX, y);
+      let hRight = 0;
+
+      if (labelRight) {
+        hRight = drawField(labelRight, valueRight, rightX, y);
+      }
+
+      y += Math.max(hLeft, hRight) + 8; // espacio entre filas
+    }
+
+    // ---- Filas de datos ----
+    twoColsRow("Fecha", fmtDate(eventDate), "Lugar", eventPlace || "-");
+    twoColsRow("Zona", String(zona), "Mesa", String(mesa));
+    // Sin precio: solo mostramos asiento en la tercera fila
+    twoColsRow("Asiento", String(asiento));
+
+    // Texto inferior de la tarjeta
     doc
       .fillColor(GRAY)
       .fontSize(9)
-      .text("Presenta este boleto en el acceso.", cardX + 12, cardY + cardH - 18);
+      .text("Presenta este boleto en el acceso.", cardX + 12, cardY + cardH - 18, {
+        width: cardW - 24,
+        align: "left",
+      });
 
     // QR
     const qrSize = 120;
-    const qrY = cardY + cardH + 14;
+    const qrY = cardY + cardH + 18;
     const qrX = (doc.page.width - qrSize) / 2;
     doc.image(qrBuf, qrX, qrY, { width: qrSize, height: qrSize });
 
     doc
       .fillColor(GRAY)
       .fontSize(9)
-      .text("Escanea este QR (próximamente).", 18, qrY + qrSize + 6, {
-        width: doc.page.width - 36,
-        align: "center",
-      });
 
     // Footer
     doc
       .fillColor(GRAY)
       .fontSize(9)
-      .text(`Ticket: ${ticketId}`, 18, doc.page.height - 24, {
-        width: doc.page.width - 36,
-        align: "center",
-      });
 
     doc.end();
     out.on("finish", resolve);
@@ -218,7 +254,7 @@ export async function ensureMergedTicketsPdf(
 ): Promise<string> {
   ensureTicketsDir();
   const outPath = mergedTicketFilePath(orderId);
-  if (fs.existsSync(outPath)) return outPath;
+  //if (fs.existsSync(outPath)) return outPath;
 
   const mergedPdf = await PdfLibDocument.create();
 

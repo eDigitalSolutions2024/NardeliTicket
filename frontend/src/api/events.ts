@@ -34,10 +34,11 @@ export async function getEvent(id: string): Promise<EventItem> {
 }
 
 // -------- BLOCKED SEATS (sold/active) --------
-export async function fetchBlockedSeats(eventId: string): Promise<string[]> {
-  const { data } = await api.get(`/events/${eventId}/blocked`);
+export async function fetchBlockedSeats(eventId: string, sessionId: string): Promise<string[]> {
+  const { data } = await api.get(`/events/${eventId}/blocked`, { params: { sessionId } });
   return Array.isArray(data?.blocked) ? (data.blocked as string[]) : [];
 }
+
 
 /* ========================
           helpers

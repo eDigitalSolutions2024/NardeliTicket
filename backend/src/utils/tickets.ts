@@ -71,8 +71,22 @@ export async function ensureTicketPdf({
     order?.eventPlace || order?.event?.location || order?.event?.lugar || "";
 
   const zona = seat?.zoneId || seat?.zone || seat?.section || "-";
-  const mesa = seat?.tableId || seat?.table || seat?.row || "-";
-  const asiento = seat?.seatId || seat?.seat || "-";
+  const mesa =
+  seat?.tableLabel ||
+  seat?.tableName ||
+  seat?.tableId ||
+  seat?.table ||
+  seat?.row ||
+  "-";
+
+const asiento =
+  seat?.seatLabel ||
+  seat?.label ||
+  seat?.seatName ||
+  seat?.seatId ||
+  seat?.seat ||
+  "-";
+
   const precio =
     typeof seat?.price === "number"
       ? seat.price

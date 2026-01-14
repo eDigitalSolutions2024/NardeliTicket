@@ -28,6 +28,7 @@ type CartPayload = {
   items: CartItem[];
   totals: CartTotals;
   sessionDate?: string;
+  sessionId?: string;
   buyer?: BuyerInfo;
 };
 
@@ -58,6 +59,7 @@ export default function CartPage() {
   const [currency] = useState<"MXN">("MXN");
   const [eventId] = useState<string>(initialPayload?.eventId ?? "");
   const [sessionDate] = useState<string | undefined>(initialPayload?.sessionDate);
+  const [sessionId] = useState<string | undefined>(initialPayload?.sessionId);
 
   // Método de pago
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
@@ -98,6 +100,7 @@ export default function CartPage() {
       items,
       totals,
       sessionDate,
+      sessionId,
       buyer: {
         name: buyerName,
         phone: buyerPhone,
@@ -142,6 +145,7 @@ async function handleCheckout(
       items,
       totals,
       sessionDate,
+      sessionId,
       paymentMethod: method,
     };
 
@@ -157,6 +161,14 @@ async function handleCheckout(
       };
     }
 
+    console.log("checkout payload", {
+      eventId,
+      sessionDate,
+      sessionId,
+      paymentMethod: method,
+      items,
+      totals,
+    });
     // 1) Preflight: confirma totales en el servidor (centavos)
     const { data: pre } = await api.post("/checkout/preflight", bodyBase);
 

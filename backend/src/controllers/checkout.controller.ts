@@ -14,6 +14,8 @@ import {
   mergedTicketFileName,
 } from "../utils/tickets";
 import { printNardeliTicket, NardeliTicketPayload } from "../utils/zebraPrinter";
+import { numToLetter, seatLabelForHold, tableLabelFromTableId } from "../utils/seatLabel";
+
 
 
 // ---------- Utilidades de pricing (centavos) ----------
@@ -70,7 +72,33 @@ function computePricingCents(eventDoc: any, items: Array<any>) {
 // ---------- Handler: PRE-FLIGHT ----------
 export const preflightCheckout = async (req: Request & { user?: any }, res: Response) => {
   try {
+    console.log("🧪 PRECHECKOUT BODY");
+    console.log("eventId:", req.body?.eventId);
+    console.log("sessionId:", req.body?.sessionId);
+    console.log("sessionDate:", req.body?.sessionDate);
+
+    console.log("items length:", Array.isArray(req.body?.items) ? req.body.items.length : "NO ARRAY");
+
+    if (Array.isArray(req.body?.items) && req.body.items.length > 0) {
+      const it = req.body.items[0];
+      console.log("first item:", {
+        zoneId: it.zoneId,
+        tableId: it.tableId,
+        seatIds: it.seatIds,
+        unitPrice: it.unitPrice,
+      });
+    }
     const { eventId, items } = req.body ?? {};
+    console.log("🧪 PRECHECKOUT BODY (seatLabels check)");
+    console.log("eventId:", eventId);
+    console.log("items length:", Array.isArray(items) ? items.length : 0);
+
+    const first = Array.isArray(items) ? items[0] : null;
+    console.log("first item keys:", first ? Object.keys(first) : null);
+    console.log("first item seatIds:", first?.seatIds);
+    console.log("first item seatLabels:", first?.seatLabels); // ✅ ESTE es el importante
+    console.log("first item:", first);
+
     if (!eventId || !Array.isArray(items) || items.length === 0) {
       return res
         .status(400)
@@ -108,6 +136,7 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
       items,
       totals,
       sessionDate,
+      sessionId,
       pricing: pricingFromClient,
       paymentMethod = "card",   // 🔹 viene del front
       cashPayment,              // 🔹 { amountGiven, change } cuando es efectivo
@@ -115,7 +144,7 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
       holdGroupId,
     } = req.body;
 
-    if (!eventId || !Array.isArray(items) || items.length === 0) {
+    if (!eventId || !Array.isArray(items) || items.length === 0 || !sessionId) {
       return res
         .status(400)
         .json({ error: "bad_request", message: "eventId e items son requeridos" });
@@ -156,6 +185,7 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
     const baseOrderData: any = {
       userId,
       eventId,
+      sessionId,
       sessionDate,
       items,
       totals, // snapshot en pesos (si lo quieres conservar)
@@ -252,20 +282,41 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
       await order.save();
 
       // Crear holds (uno por asiento) - backward compatible
-      const holdDocs = items.flatMap((it: any) =>
-        (it.seatIds || []).map((s: string) => ({
-          eventId,
-          tableId: it.tableId,
-          seatId: s,
-          userId,
-          orderId,
-          status: "active",
-          expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-        }))
-      );
-      if (holdDocs.length) {
-        await SeatHold.insertMany(holdDocs, { ordered: false });
-      }
+    // Crear holds (uno por asiento) - TARJETA
+const holdDocs = items.flatMap((it: any) =>
+  (it.seatIds || []).map((s: string, idx: number) => {
+    const seatLabel =
+      Array.isArray(it.seatLabels) && typeof it.seatLabels[idx] === "string"
+        ? String(it.seatLabels[idx]).trim()
+        : undefined;
+
+    // tableLabel: "VIP-01" -> "VIP-A" / "ORO-18" -> "ORO-R"
+    const num = parseInt(String(it.tableId).split("-")[1] || "0", 10);
+    const tableLetter = Number.isFinite(num) && num > 0 ? numToLetter(num) : undefined;
+    const tableLabel = tableLetter
+      ? `${String(it.zoneId).toUpperCase()}-${tableLetter}`
+      : undefined;
+
+    return {
+      eventId,
+      sessionId,
+      tableId: it.tableId,      // para lógica/bloqueo
+      seatId: s,                // para lógica/bloqueo
+      zoneId: it.zoneId,        // recomendado
+      seatLabel,                // NUEVO: "A4"
+      tableLabel,               // NUEVO: "VIP-A"
+      userId,
+      orderId,
+      status: "active",
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+    };
+  })
+);
+
+if (holdDocs.length) {
+  await SeatHold.insertMany(holdDocs, { ordered: false });
+}
+
 
       return res.json({ checkoutUrl: session.url, orderId });
     }
@@ -388,24 +439,41 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
 
       // Para efectivo: los asientos ya quedan "vendidos" de inmediato
       const holdDocs = items.flatMap((it: any) =>
-        (it.seatIds || []).map((s: string) => ({
-          eventId,
-          tableId: it.tableId,
-          seatId: s,
-          userId,
-          orderId,
-          status: "sold",     // 👈 ya está pagado
-          expiresAt: null,    // no expira
-        }))
+        (it.seatIds || []).map((s: string, idx: number) => {
+          const seatLabel = Array.isArray(it.seatLabels) ? it.seatLabels[idx] : undefined;
+
+          // opción 1 (recomendada): calcular tableLabel desde tableId "ORO-18" => "R"
+          const num = parseInt(String(it.tableId).split("-")[1] || "0", 10);
+          const tableLetter = Number.isFinite(num) && num > 0 ? numToLetter(num) : undefined;
+          const tableLabel = tableLetter ? `${String(it.zoneId).toUpperCase()}-${tableLetter}` : undefined;
+
+          return {
+            eventId,
+            sessionId,
+            tableId: it.tableId,      // se queda así para lógica/bloqueo
+            seatId: s,                // se queda así para lógica/bloqueo
+            seatLabel,                // 👈 NUEVO: "R2"
+            tableLabel,               // 👈 NUEVO: "ORO-R" (o guarda solo "R" si prefieres)
+            userId,
+            orderId,
+            status: "sold",
+            expiresAt: null,
+            zoneId: it.zoneId,        // 👈 recomendado guardarlo también
+          };
+        })
       );
 
       if (holdDocs.length) {
         await SeatHold.insertMany(holdDocs, { ordered: false });
       }
 
+
       const successUrl = `${process.env.PUBLIC_URL}/checkout/success?orderId=${orderId}`;
 
       return res.json({ ok: true, orderId, successUrl });
+
+
+      
     }
 
     // Si llega algo raro
@@ -587,12 +655,30 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
         pricePesos = it.unitPrice;
       }
 
+      const rawSeatId = String((s as any)?.seatId ?? (t as any)?.seatId ?? (s as any)?.seat ?? "");
+      const idxInItem = Array.isArray(it?.seatIds) ? it.seatIds.findIndex((x: any) => String(x) === rawSeatId) : -1;
+
       const seatForPdf = {
         zoneId,
-        tableId: t.tableId ?? s.tableId ?? s.table ?? undefined,
-        seatId: s.seatId ?? t.seatId ?? s.seat ?? undefined,
+
+        tableLabel:
+          (s as any)?.tableLabel ??
+          (t as any)?.tableLabel ??
+          tableLabelFromTableId((t as any)?.tableId ?? (s as any)?.tableId ?? (s as any)?.table ?? undefined) ??
+          undefined,
+
+        seatLabel:
+          (s as any)?.seatLabel ??
+          (t as any)?.seatLabel ??
+          (it && idxInItem >= 0 ? seatLabelForHold(it, rawSeatId, idxInItem) : undefined) ??
+          undefined,
+
+        tableId: (t as any)?.tableId ?? (s as any)?.tableId ?? (s as any)?.table ?? undefined,
+        seatId: rawSeatId || undefined,
+
         price: pricePesos,
       };
+
 
       const eventName = event?.title ?? "Evento";
       const eventDate =

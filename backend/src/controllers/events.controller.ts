@@ -168,17 +168,23 @@ export async function deleteEvent(req: Request, res: Response) {
 export async function getBlockedSeats(req: Request, res: Response) {
   try {
     const { eventId } = req.params;
+    const { sessionId } = req.query as { sessionId?: string };
+
+    if (!sessionId) {
+      return res.status(400).json({ error: "missing_sessionId" });
+    }
 
     const holds = await SeatHold.find(
-      { eventId, status: { $in: ["sold", "active"] } }, // <- ajusta si quieres solo "sold"
+      { eventId, sessionId, status: { $in: ["sold", "active"] } }, // ✅ ahora por sesión
       { tableId: 1, seatId: 1, _id: 0 }
     ).lean();
 
-    const blocked = holds.map(h => `${h.tableId}:${h.seatId}`);
+    const blocked = holds.map((h) => `${h.tableId}:${h.seatId}`);
     res.json({ blocked });
   } catch (e) {
     console.error(e);
     res.status(500).json({ error: "failed_to_get_blocked" });
   }
 }
+
 

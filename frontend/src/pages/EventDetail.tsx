@@ -18,7 +18,7 @@ export default function EventDetail() {
 
   const [event, setEvent] = useState<EventItem | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<{ sessionId: string; sessionDate: string } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -68,32 +68,36 @@ export default function EventDetail() {
               <p>No hay fechas próximas.</p>
             ) : (
               <div style={{ display: "grid", gap: 8 }}>
-                {futureSessions.map((s) => (
-                  <label
-                    key={s.id ?? s.date}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      border: "1px solid #e6e8ef",
-                      padding: "10px 12px",
-                      borderRadius: 10,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="session"
-                      value={s.date}
-                      checked={selected === s.date}
-                      onChange={() => setSelected(s.date)}
-                    />
-                    <span>{new Date(s.date).toLocaleString("es-MX")}</span>
-                  </label>
-                ))}
+                {futureSessions.map((s: any) => {
+                  const sid = String(s._id ?? s.id ?? s.date); // ✅ usa _id si viene de Mongo, si no usa id
+                  return (
+                    <label
+                      key={sid}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        border: "1px solid #e6e8ef",
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="session"
+                        value={s.date}
+                        checked={selected?.sessionId === sid}
+                        onChange={() => setSelected({ sessionId: sid, sessionDate: s.date })}
+                      />
+                      <span>{new Date(s.date).toLocaleString("es-MX")}</span>
+                    </label>
+                  );
+                })}
               </div>
             )}
           </div>
+
 
           {/* Acciones */}
           <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
@@ -102,12 +106,12 @@ export default function EventDetail() {
               disabled={!selected}
               onClick={() => {
                   if (!selected || !event) return;
-                  // Ir a la página de selección con el id en la URL
-                  // y pasar la fecha/ sesión seleccionada por state
                   navigate(`/event/${event.id}/seleccion`, {
-                    state: { sessionDate: selected,
+                    state: {
+                      sessionDate: selected.sessionDate,
+                      sessionId: selected.sessionId,
                       eventName: event.title,
-                     },
+                    }
                   });
                 }}
               style={{ height: 44, padding: "0 16px", fontWeight: 700 }}

@@ -3,7 +3,11 @@ export interface TicketPricing {
   oro?: number;
 }
 
-export interface EventSession { id?: string; date: string; } // ISO
+export interface EventSession { id?: string; 
+  date: string; 
+  disabledTables: string[];
+  disabledSeats: string[];
+} // ISO
 export type EventStatus = "draft" | "published";
 
 export interface EventItem {

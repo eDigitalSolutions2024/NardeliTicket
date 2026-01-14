@@ -55,15 +55,38 @@ const emptyForm: FormState = {
 const toISO = (local: string) => new Date(local).toISOString();
 const isFuture = (iso: string) => new Date(iso).getTime() >= Date.now();
 const sortAsc = (a: string, b: string) => new Date(a).getTime() - new Date(b).getTime();
-const uniqueISO = (list: string[]) => Array.from(new Set(list));
+//const uniqueISO = (list: string[]) => Array.from(new Set(list));
 
 function normalizeSessions(arr: EventSession[]): EventSession[] {
-  const isoList = arr
-    .map((s) => (typeof s.date === "string" ? s.date : new Date(s.date).toISOString()))
-    .filter(Boolean);
-  const clean = uniqueISO(isoList).sort(sortAsc);
-  return clean.map((d) => ({ date: d }));
+  const byDate = new Map<string, EventSession>();
+
+  for (const s of arr) {
+    const iso =
+      typeof s.date === "string" ? s.date : new Date(s.date).toISOString();
+    if (!iso) continue;
+
+    if (!byDate.has(iso)) {
+      byDate.set(iso, {
+        id: s.id || crypto.randomUUID(),
+        date: iso,
+        disabledTables: s.disabledTables ?? [],
+        disabledSeats: s.disabledSeats ?? [],
+      });
+    } else {
+      const prev = byDate.get(iso)!;
+      byDate.set(iso, {
+        id: prev.id || s.id || crypto.randomUUID(),
+        date: iso,
+        disabledTables: prev.disabledTables?.length ? prev.disabledTables : (s.disabledTables ?? []),
+        disabledSeats: prev.disabledSeats?.length ? prev.disabledSeats : (s.disabledSeats ?? []),
+      });
+    }
+  }
+
+  return Array.from(byDate.values()).sort((a, b) => sortAsc(a.date, b.date));
 }
+
+
 function nextFuture(sessions: EventSession[]): string | null {
   const futures = (sessions ?? [])
     .map((s) => s.date)
@@ -135,13 +158,25 @@ export default function AdminDashboard() {
   }
 
   // sesiones
-  function addSessionFromInput() {
-    if (!sessionInput) return;
-    const iso = toISO(sessionInput);
-    const merged = normalizeSessions([...form.sessions, { date: iso }]);
-    setField("sessions", merged);
-    setSessionInput("");
-  }
+function addSessionFromInput() {
+  if (!sessionInput) return;
+
+  const iso = toISO(sessionInput);
+
+  const merged = normalizeSessions([
+    ...form.sessions,
+    {
+      id: crypto.randomUUID(),
+      date: iso,
+      disabledTables: [],
+      disabledSeats: [],
+    },
+  ]);
+
+  setField("sessions", merged);
+  setSessionInput("");
+}
+
   function removeSession(idx: number) {
     const copy = [...form.sessions];
     copy.splice(idx, 1);

@@ -2,8 +2,11 @@ import { Schema, model, Document } from "mongoose";
 
 export interface ISeatHold extends Document {
   eventId: string;
+  sessionId: string;
   tableId?: string;    // opcional por si hay holds de zona sin mesa fija
-  seatId?: string;     // igual opcional si a veces se aparta por zona
+  seatId?: string; 
+  tableLabel?: string;
+  seatLabel?: string;    // igual opcional si a veces se aparta por zona
   userId: string;
   orderId?: string;
   createdAt: Date;
@@ -20,13 +23,15 @@ export interface ISeatHold extends Document {
 const SeatHoldSchema = new Schema<ISeatHold>(
   {
     eventId: { type: String, index: true },
+    sessionId: { type: String, index: true, required: true },
     holdGroup: { type: String, index: true },
-    // crea el hold con vencimiento a 15 min
     expiresAt: { type: Date, default: () => new Date(Date.now() + 15 * 60 * 1000) },
     status: { type: String, enum: ["active","attached_to_order","released","sold"], default: "active" },
     eventLayoutVersion: { type: Number },
     tableId: String,
     seatId: String,
+    tableLabel: String,
+    seatLabel: String,
     userId: String,
     orderId: String,
 
@@ -36,28 +41,26 @@ const SeatHoldSchema = new Schema<ISeatHold>(
   { timestamps: true }
 );
 
-/**
- * TTL: usa el campo 'expiresAt' como TTL para limpiar holds.
- * IMPORTANTE: TTL en Mongo es por campo de fecha; si un doc NO tiene expiresAt, NO expira.
- * - Para 'sold' o 'attached_to_order', puedes 'unset' de expiresAt al confirmar, así NO se borra.
- */
+
 SeatHoldSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-/**
- * Unicidad:
- * - Solo un 'active' por (eventId, seatId)
- * - Solo un 'sold'  por (eventId, seatId)
- * Así evitas conflictos entre estados y puedes transicionar de active→sold sin duplicados simultáneos.
- */
 SeatHoldSchema.index(
-  { eventId: 1, seatId: 1 },
-  { unique: true, partialFilterExpression: { status: "active" } }
+  { eventId: 1, sessionId: 1, tableId: 1, seatId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: "active", seatId: { $exists: true, $type: "string" } },
+  }
 );
 
 SeatHoldSchema.index(
-  { eventId: 1, seatId: 1 },
-  { unique: true, partialFilterExpression: { status: "sold" } }
+  { eventId: 1, sessionId: 1, tableId: 1, seatId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: "sold", seatId: { $exists: true, $type: "string" } },
+  }
 );
+
+
 
 // (Si quieres incluir 'zoneId' en la unicidad cuando NO hay seatId, agrega índices análogos para (eventId, zoneId))
 

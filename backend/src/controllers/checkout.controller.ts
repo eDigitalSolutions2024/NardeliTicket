@@ -14,7 +14,7 @@ import {
   mergedTicketFileName,
 } from "../utils/tickets";
 import { printNardeliTicket, NardeliTicketPayload } from "../utils/zebraPrinter";
-import { numToLetter, seatLabelForHold, tableLabelFromTableId } from "../utils/seatLabel";
+import { numToLetter, tableLabelFromTableId } from "../utils/seatLabel";
 
 
 
@@ -440,7 +440,11 @@ if (holdDocs.length) {
       // Para efectivo: los asientos ya quedan "vendidos" de inmediato
       const holdDocs = items.flatMap((it: any) =>
         (it.seatIds || []).map((s: string, idx: number) => {
-          const seatLabel = Array.isArray(it.seatLabels) ? it.seatLabels[idx] : undefined;
+          const seatLabel =
+            Array.isArray(it.seatLabels) && typeof it.seatLabels[idx] === "string"
+              ? String(it.seatLabels[idx]).trim()
+              : undefined;
+
 
           // opción 1 (recomendada): calcular tableLabel desde tableId "ORO-18" => "R"
           const num = parseInt(String(it.tableId).split("-")[1] || "0", 10);
@@ -605,22 +609,25 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
     }
 
     const event = order.eventId ? await Event.findById(order.eventId).lean() : null;
-    const seats = await SeatHold.find({ orderId, status: "sold" }).lean();
+    const seats = await SeatHold.find({
+  orderId,
+  status: { $in: ["sold", "active"] }, // card -> active, cash -> sold
+}).lean();
 
-    const tickets =
-      order.tickets && order.tickets.length
-        ? order.tickets.map((t: any) => ({
-            ticketId: String(t.ticketId),
-            seatId: String(t.seatId),
-            tableId: t.tableId,
-            zoneId: t.zoneId,
-          }))
-        : seats.map((s: any) => ({
-            ticketId: String(s._id),
-            seatId: String(s._id),
-            tableId: s.tableId,
-            zoneId: s.zoneId,
-          }));
+    console.log("SeatHold sample:", seats[0]);
+
+    const tickets = seats.map((s: any) => ({
+  ticketId: String(s._id),       // 👈 ticket pdf id = SeatHold _id (consistente)
+  seatId: String(s.seatId),
+  tableId: s.tableId,
+  zoneId: s.zoneId,
+  seatLabel: s.seatLabel,
+  tableLabel: s.tableLabel,
+}));
+
+
+
+
 
     if (!tickets.length) {
       return res
@@ -638,7 +645,11 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
     // generar PDFs individuales
     for (const t of tickets) {
       const s =
-        seats.find((x: any) => String(x._id) === String(t.seatId)) || ({} as any);
+  seats.find((x: any) => String(x._id) === String(t.ticketId)) ||
+  seats.find((x: any) => String(x.seatId) === String(t.seatId)) || // ✅
+  ({} as any);
+
+
       const it =
         itemBySeat.get(String(s.seatId)) ||
         itemBySeat.get(String(s._id)) ||
@@ -659,25 +670,22 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
       const idxInItem = Array.isArray(it?.seatIds) ? it.seatIds.findIndex((x: any) => String(x) === rawSeatId) : -1;
 
       const seatForPdf = {
-        zoneId,
+  zoneId,
 
-        tableLabel:
-          (s as any)?.tableLabel ??
-          (t as any)?.tableLabel ??
-          tableLabelFromTableId((t as any)?.tableId ?? (s as any)?.tableId ?? (s as any)?.table ?? undefined) ??
-          undefined,
+  tableLabel:
+    (s as any)?.tableLabel ??
+    tableLabelFromTableId((t as any)?.tableId ?? (s as any)?.tableId) ??
+    undefined,
 
-        seatLabel:
-          (s as any)?.seatLabel ??
-          (t as any)?.seatLabel ??
-          (it && idxInItem >= 0 ? seatLabelForHold(it, rawSeatId, idxInItem) : undefined) ??
-          undefined,
+  seatLabel:
+    (s as any)?.seatLabel ??   // ✅ PRIORIDAD ABSOLUTA
+    undefined,
 
-        tableId: (t as any)?.tableId ?? (s as any)?.tableId ?? (s as any)?.table ?? undefined,
-        seatId: rawSeatId || undefined,
+  tableId: (t as any)?.tableId ?? (s as any)?.tableId ?? undefined,
+  seatId: rawSeatId || undefined,
+  price: pricePesos,
+};
 
-        price: pricePesos,
-      };
 
 
       const eventName = event?.title ?? "Evento";
@@ -691,6 +699,7 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
         eventDate,
         eventPlace,
       };
+console.log("DEBUG seatForPdf ->", seatForPdf);
 
       await ensureTicketPdf({
         ticketId: t.ticketId,
@@ -726,4 +735,5 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
       .status(500)
       .json({ message: "No se pudieron generar los PDFs", detail: e.message });
   }
+  
 }

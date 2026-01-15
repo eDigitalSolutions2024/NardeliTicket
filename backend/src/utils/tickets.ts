@@ -46,6 +46,42 @@ function money(n?: number) {
   return `$${n.toFixed(2)} MXN`;
 }
 
+
+
+
+function tableIdToLabel(tableId?: string): string | null {
+  if (!tableId) return null;
+
+  // VIP-3 -> VIP-C
+  // ORO-1 -> ORO-A
+  const m = String(tableId).match(/^([A-Z]+)[-_](\d+)$/i);
+  if (!m) return String(tableId);
+
+  const zone = m[1].toUpperCase();
+  const n = parseInt(m[2], 10);
+  if (!Number.isFinite(n) || n <= 0) return String(tableId);
+
+  // 1->A, 2->B, 3->C ...
+  const letter = String.fromCharCode(64 + n); // 65 = 'A'
+  return `${zone}-${letter}`;
+}
+
+function seatIdToLabel(seatId?: string): string | null {
+  if (!seatId) return null;
+
+  // seatId puede venir como "S21" o "21"
+  const m = String(seatId).match(/(\d+)/);
+  if (!m) return String(seatId);
+
+  const n = parseInt(m[1], 10);
+  if (!Number.isFinite(n) || n <= 0) return String(seatId);
+
+  // Convierte a 1..8 (siempre 8 asientos por mesa)
+  const seatIndex = ((n - 1) % 8) + 1;
+  return `C${seatIndex}`; // 👈 si prefieres "1" cambia a String(seatIndex)
+}
+
+
 // ---------- PDF de UN boleto ----------
 export async function ensureTicketPdf({
   ticketId,
@@ -71,21 +107,26 @@ export async function ensureTicketPdf({
     order?.eventPlace || order?.event?.location || order?.event?.lugar || "";
 
   const zona = seat?.zoneId || seat?.zone || seat?.section || "-";
-  const mesa =
+  const mesaRaw =
   seat?.tableLabel ||
   seat?.tableName ||
   seat?.tableId ||
   seat?.table ||
   seat?.row ||
-  "-";
+  "";
+
+const mesa = mesaRaw ? (tableIdToLabel(mesaRaw) ?? String(mesaRaw)) : "-";
+
+
 
 const asiento =
-  seat?.seatLabel ||
-  seat?.label ||
-  seat?.seatName ||
-  seat?.seatId ||
-  seat?.seat ||
-  "-";
+  seat?.seatLabel
+    ? String(seat.seatLabel)   // ✅ F7
+    : seat?.seatId
+    ? String(seat.seatId)      // fallback S57
+    : "-";
+
+
 
   const precio =
     typeof seat?.price === "number"

@@ -3,7 +3,7 @@ import  { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { fetchEvents } from "../api/events";
 import type { EventItem } from "../types/Event";
-import EventCard from "../components/EventCard";
+import EventTile from "../components/EventTile";
 import "../CSS/Home.css"; // reuse de grillas/clases básicas si ya las tienes
 
 function useQueryParam(name: string) {
@@ -35,6 +35,7 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(true);
 
   const q = useQueryParam("q").trim().toLowerCase();
+  const categoryFilter = useQueryParam("category").trim();
 
   useEffect(() => {
     (async () => {
@@ -47,10 +48,11 @@ export default function EventsPage() {
     })();
   }, []);
 
-  // filtra publicados y por query del navbar
+  // filtra publicados, por categoría (si viene en la URL) y por query del navbar
   const filtered = useMemo(() => {
     return events
       .filter((e) => e.status === "published")
+      .filter((e) => (categoryFilter ? (e.category || "Otros") === categoryFilter : true))
       .filter((e) => {
         if (!q) return true;
         return (
@@ -59,7 +61,7 @@ export default function EventsPage() {
           e.city.toLowerCase().includes(q)
         );
       });
-  }, [events, q]);
+  }, [events, q, categoryFilter]);
 
   // agrupa por categoría, ordena cada grupo por próxima fecha
   const grouped = useMemo(() => {
@@ -91,11 +93,6 @@ export default function EventsPage() {
     return ordered;
   }, [filtered]);
 
-  const onOpenEvent = (id: string) => {
-    // más adelante: navigate(`/evento/${id}`)
-    console.log("open event", id);
-  };
-
   return (
     <main className="home u-container" style={{ paddingTop: 16, paddingBottom: 32 }}>
       <div className="page-backdrop" aria-hidden />
@@ -116,14 +113,9 @@ export default function EventsPage() {
             <div className="events__header u-flex-between">
               <h2 style={{ margin: 0 }}>{category}</h2>
             </div>
-            <div className="events__grid">
+            <div className="tm-grid">
               {items.map((ev) => (
-                <EventCard
-                  key={ev.id}
-                  ev={ev}
-                  onClick={onOpenEvent}
-                  className="card card--clickable"
-                />
+                <EventTile key={ev.id} ev={ev} />
               ))}
             </div>
           </section>

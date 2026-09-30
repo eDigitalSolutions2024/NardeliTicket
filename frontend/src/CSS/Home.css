@@ -183,6 +183,55 @@
 .link-quiet:hover { color: var(--color-primary-600); }
 
 /* ============================================================
+   Categorías (estilo descubrimiento)
+   ============================================================ */
+.tm-cats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+}
+.tm-cat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 6px;
+  height: 116px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  color: #fff;
+  text-decoration: none;
+  background: linear-gradient(135deg, var(--c1, #7c3aed), var(--c2, #a855f7));
+  box-shadow: var(--shadow-1);
+  transition: transform var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+.tm-cat::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120px 120px at 85% 15%, rgba(255, 255, 255, 0.25), transparent 70%);
+  pointer-events: none;
+}
+.tm-cat:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-glow);
+  color: #fff;
+}
+.tm-cat__icon { font-size: 1.9rem; filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.3)); }
+.tm-cat__label { font-family: var(--font-display); font-weight: 800; font-size: 1.05rem; }
+
+/* ============================================================
+   Grid de tiles editoriales
+   ============================================================ */
+.tm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 22px;
+}
+
+/* ============================================================
    Grid de eventos
    ============================================================ */
 .events__grid {

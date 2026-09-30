@@ -2,6 +2,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import { api } from "../api/client";
+import { getEvent } from "../api/events";
+import type { EventItem } from "../types/Event";
+import "../CSS/Cart.css";
 
 type CartItem = {
   zoneId: string;      // "VIP" | "ORO" | "GENERAL"
@@ -68,6 +71,24 @@ export default function CartPage() {
   const [eventId] = useState<string>(initialPayload?.eventId ?? "");
   const [sessionDate] = useState<string | undefined>(initialPayload?.sessionDate);
   const [sessionId] = useState<string | undefined>(initialPayload?.sessionId);
+
+  // Datos del evento (para la vista previa)
+  const [event, setEvent] = useState<EventItem | null>(null);
+  useEffect(() => {
+    let alive = true;
+    if (!eventId) return;
+    (async () => {
+      try {
+        const ev = await getEvent(eventId);
+        if (alive) setEvent(ev);
+      } catch {
+        /* si falla, seguimos sin preview */
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [eventId]);
 
   // Método de pago
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
@@ -293,195 +314,136 @@ async function handleCheckout(
   // 6) Si no hay payload/ítems, UI de vacío
   if (!initialPayload && items.length === 0) {
     return (
-      <div style={{ padding: 24 }}>
-        <h1 style={{ fontSize: 42, marginBottom: 8 }}>Carrito</h1>
-        <p>No llegó ningún payload. Vuelve a seleccionar asientos y dale “Continuar al pago”.</p>
-        <Link to="/events">Ir a eventos</Link>
+      <div className="cart">
+        <div className="cart-backdrop" aria-hidden />
+        <h1 className="cart__title">Carrito</h1>
+        <p className="cart__empty">Tu carrito está vacío. Vuelve a elegir tus boletos.</p>
+        <Link to="/events" className="cart__empty-link">Ir a eventos →</Link>
       </div>
     );
   }
 
+  const isCash = paymentMethod === "cash";
+
   return (
-    <div style={{ padding: 24, position: "relative" }}>
-      <h1 style={{ fontSize: 42, marginBottom: 4 }}>Carrito</h1>
-      {sessionDate && (
-        <div style={{ marginBottom: 16, color: "#4b5563" }}>
-          Sesión:{" "}
-          {new Date(sessionDate).toLocaleString("es-MX", {
-            dateStyle: "medium",
-            timeStyle: "short",
-          })}
-        </div>
-      )}
+    <div className="cart">
+      <div className="cart-backdrop" aria-hidden />
+      <h1 className="cart__title">Carrito</h1>
 
       {items.length === 0 ? (
         <>
-          <p>Tu carrito está vacío.</p>
-          <button
-            onClick={() => navigate(`/event/${eventId}/seleccion`)}
-            style={{ padding: "8px 14px", borderRadius: 8, border: "1px solid #e5e7eb" }}
-          >
+          <p className="cart__empty">Tu carrito está vacío.</p>
+          <button className="cart-btn" onClick={() => navigate(`/event/${eventId}/seleccion`)}>
             Volver a seleccionar asientos
           </button>
         </>
       ) : (
-        <>
+        <div className="cart-grid">
+          <div className="cart-main">
+            {/* Vista previa del evento */}
+            {event && (
+              <div className="cart-event">
+                <div className="cart-event__media">
+                  <img className="cart-event__blur" src={event.imageUrl} alt="" aria-hidden />
+                  <img className="cart-event__img" src={event.imageUrl} alt={event.title} />
+                </div>
+                <div className="cart-event__info">
+                  {event.category && <span className="cart-event__cat">✦ {event.category}</span>}
+                  <h2 className="cart-event__title">{event.title}</h2>
+                  <p className="cart-event__meta">📍 {event.venue} — {event.city}</p>
+                  {sessionDate && (
+                    <p className="cart-event__date">
+                      🗓️{" "}
+                      {new Date(sessionDate).toLocaleString("es-MX", {
+                        weekday: "long",
+                        day: "2-digit",
+                        month: "long",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
           {/* Lista de items */}
-          <div
-            style={{
-              border: "1px solid #e5e7eb",
-              borderRadius: 12,
-              overflow: "hidden",
-              background: "#fff",
-              marginBottom: 16,
-            }}
-          >
+          <div className="cart-items">
             {items.map((it, idx) => {
               const isGeneral = !(Array.isArray(it.seatIds) && it.seatIds.length);
               const qty = itemQty(it);
 
               return (
-                <div
-                  key={it.tableId + ":" + idx}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto",
-                    gap: 8,
-                    padding: 14,
-                    borderBottom: "1px solid #f3f4f6",
-                  }}
-                >
+                <div key={it.tableId + ":" + idx} className="cart-item">
                   <div>
                     {isGeneral ? (
                       <>
-                        <div style={{ fontWeight: 700 }}>
-                          Boleto general{" "}
-                          <span style={{ color: "#6b7280" }}>(admisión general)</span>
+                        <div className="cart-item__title">
+                          Boleto general <span className="cart-item__sub">(admisión general)</span>
                         </div>
-                        <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 13, color: "#6b7280" }}>Cantidad:</span>
-                          <button
-                            onClick={() => updateQty(idx, qty - 1)}
-                            style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #d1d5db", fontSize: 16 }}
-                          >
-                            −
-                          </button>
-                          <span style={{ minWidth: 28, textAlign: "center", fontWeight: 700 }}>{qty}</span>
-                          <button
-                            onClick={() => updateQty(idx, qty + 1)}
-                            style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #d1d5db", fontSize: 16 }}
-                          >
-                            +
-                          </button>
+                        <div className="cart-qty">
+                          <span className="cart-qty__label">Cantidad:</span>
+                          <button onClick={() => updateQty(idx, qty - 1)}>−</button>
+                          <span className="cart-qty__num">{qty}</span>
+                          <button onClick={() => updateQty(idx, qty + 1)}>+</button>
                         </div>
-                        <button
-                          onClick={() => removeTable(it.tableId)}
-                          style={{
-                            marginTop: 10,
-                            padding: "4px 10px",
-                            borderRadius: 8,
-                            border: "1px solid #fecaca",
-                            background: "#fff1f2",
-                            color: "#b91c1c",
-                            fontSize: 12,
-                          }}
-                        >
+                        <button className="cart-remove" onClick={() => removeTable(it.tableId)}>
                           Quitar
                         </button>
                       </>
                     ) : (
                       <>
-                        <div style={{ fontWeight: 700 }}>
-                          {it.tableId} <span style={{ color: "#6b7280" }}>({it.zoneId})</span>
+                        <div className="cart-item__title">
+                          {it.tableId} <span className="cart-item__sub">({it.zoneId})</span>
                         </div>
-                        <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        <div className="cart-seats">
                           {it.seatIds.map((sid) => (
                             <span
                               key={sid}
                               title="Quitar asiento"
+                              className="cart-seat"
                               onClick={() => removeSeat(it.tableId, sid)}
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: 6,
-                                padding: "4px 8px",
-                                borderRadius: 999,
-                                border: "1px solid #e5e7eb",
-                                background: "#f9fafb",
-                                cursor: "pointer",
-                                userSelect: "none",
-                                fontSize: 13,
-                              }}
                             >
                               {sid}
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                                <path d="M18 6L6 18M6 6l12 12" stroke="#9ca3af" strokeWidth="2" />
+                                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" />
                               </svg>
                             </span>
                           ))}
                         </div>
-                        <button
-                          onClick={() => removeTable(it.tableId)}
-                          style={{
-                            marginTop: 10,
-                            padding: "4px 10px",
-                            borderRadius: 8,
-                            border: "1px solid #fecaca",
-                            background: "#fff1f2",
-                            color: "#b91c1c",
-                            fontSize: 12,
-                          }}
-                        >
+                        <button className="cart-remove" onClick={() => removeTable(it.tableId)}>
                           Quitar mesa completa
                         </button>
                       </>
                     )}
                   </div>
 
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontWeight: 700 }}>
-                      {money(it.unitPrice * qty, currency)}
-                    </div>
-                    <div style={{ color: "#6b7280", fontSize: 12 }}>
-                      {money(it.unitPrice, currency)} c/u
-                    </div>
+                  <div className="cart-item__amount">
+                    <div className="cart-price">{money(it.unitPrice * qty, currency)}</div>
+                    <div className="cart-price__unit">{money(it.unitPrice, currency)} c/u</div>
                   </div>
                 </div>
               );
             })}
           </div>
+          </div>{/* /cart-main */}
 
+          <aside className="cart-side">
           {/* Totales */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr auto",
-              gap: 8,
-              maxWidth: 520,
-              marginBottom: 16,
-            }}
-          >
-            <div>Subtotal</div>
-            <div style={{ fontWeight: 700 }}>{money(totals.subtotal, currency)}</div>
-            <div>Tarifa de servicio {feePct ? `(${feePct}%)` : ""}</div>
-            <div style={{ fontWeight: 700 }}>{money(totals.fees, currency)}</div>
-            <div>Total</div>
-            <div style={{ fontWeight: 800, fontSize: 18 }}>{money(totals.total, currency)}</div>
+          <div className="cart-totals">
+            <div className="lbl">Subtotal</div>
+            <div className="val">{money(totals.subtotal, currency)}</div>
+            <div className="lbl">Tarifa de servicio {feePct ? `(${feePct}%)` : ""}</div>
+            <div className="val">{money(totals.fees, currency)}</div>
+            <hr />
+            <div className="total-lbl">Total</div>
+            <div className="total-val">{money(totals.total, currency)}</div>
           </div>
 
           {/* Selector de método de pago */}
-          <div
-            style={{
-              maxWidth: 520,
-              marginBottom: 16,
-              padding: 12,
-              borderRadius: 10,
-              border: "1px solid #e5e7eb",
-              background: "#f9fafb",
-            }}
-          >
-            <div style={{ fontWeight: 600, marginBottom: 8 }}>Método de pago</div>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+          <div className="cart-pay">
+            <div className="cart-pay__title">Método de pago</div>
+            <label>
               <input
                 type="radio"
                 name="paymentMethod"
@@ -491,7 +453,7 @@ async function handleCheckout(
               />
               <span>Tarjeta / pago en línea</span>
             </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <label>
               <input
                 type="radio"
                 name="paymentMethod"
@@ -503,7 +465,7 @@ async function handleCheckout(
             </label>
 
             {paymentMethod === "cash" && (
-              <p style={{ marginTop: 8, fontSize: 12, color: "#92400e" }}>
+              <p className="cart-pay__note">
                 El pago en efectivo es solo para taquilla/admin dentro del salón. Registra los datos
                 del cliente, el monto recibido y el cambio antes de confirmar.
               </p>
@@ -511,55 +473,28 @@ async function handleCheckout(
           </div>
 
           {/* Acciones */}
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <button
-              onClick={() => navigate(`/event/${eventId}/seleccion`)}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 10,
-                border: "1px solid #e5e7eb",
-                background: "#fff",
-              }}
-            >
+          <div className="cart-actions">
+            <button className="cart-btn" onClick={() => navigate(`/event/${eventId}/seleccion`)}>
               Seguir seleccionando
             </button>
 
             <button
+              className="cart-btn cart-btn--danger"
               onClick={clearAll}
-              style={{
-                padding: "10px 14px",
-                borderRadius: 10,
-                border: "1px solid #fee2e2",
-                background: "#fff1f2",
-                color: "#991b1b",
-              }}
             >
               Vaciar carrito
             </button>
 
             <button
+              className={`cart-btn cart-btn--pay ${isCash ? "is-cash" : ""}`}
               onClick={handlePayClick}
               disabled={items.length === 0}
-              style={{
-                padding: "10px 16px",
-                borderRadius: 10,
-                border: "none",
-                background:
-                  items.length === 0
-                    ? "#9ca3af"
-                    : paymentMethod === "card"
-                    ? "#22c55e"
-                    : "#f59e0b",
-                color: "white",
-                fontWeight: 700,
-                marginLeft: "auto",
-                cursor: items.length === 0 ? "not-allowed" : "pointer",
-              }}
             >
               {paymentMethod === "card" ? "Pagar ahora" : "Registrar pago en efectivo"}
             </button>
           </div>
-        </>
+          </aside>{/* /cart-side */}
+        </div>
       )}
 
       {/* MODAL PAGO EN EFECTIVO */}

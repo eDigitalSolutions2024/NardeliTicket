@@ -1,11 +1,20 @@
 // src/pages/Home.tsx
 import  { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import SimpleCarousel, { type Slide } from "../components/SimpleCarousel";
 import type { EventItem } from "../types/Event";
-import EventCard from "../components/EventCard";
+import EventTile from "../components/EventTile";
 import WebGLParticles from "../components/WebGLParticles";
 import { fetchEvents } from "../api/events";
 import "../CSS/Home.css";
+
+const CATEGORIES = [
+  { key: "Conciertos", icon: "🎤", c1: "#7c3aed", c2: "#a855f7" },
+  { key: "Teatro", icon: "🎭", c1: "#9333ea", c2: "#c084fc" },
+  { key: "Deportes", icon: "⚽", c1: "#6d28d9", c2: "#8b5cf6" },
+  { key: "Familiares", icon: "🎈", c1: "#a21caf", c2: "#d946ef" },
+  { key: "Especiales", icon: "✨", c1: "#7c3aed", c2: "#ec4899" },
+];
 
 // Slides estáticos
 {/*const staticSlides: Slide[] = [
@@ -126,23 +135,25 @@ export default function Home() {
     </div>
 
 
-      {/* Categorías (chips) 
-      <section className="home__section">
-        <div className="section-header">
-          <h2>Explorar por categoría</h2>
+      {/* Categorías */}
+      <section className="home__section home__section--cats">
+        <div className="events__header">
+          <h2>Explora por categoría</h2>
         </div>
-        <div className="chip-row">
-          {categories.map((c) => (
-            <a
+        <div className="tm-cats">
+          {CATEGORIES.map((c) => (
+            <Link
               key={c.key}
-              className="chip"
-              href={`/events?category=${encodeURIComponent(c.key)}`}
+              to={`/events?category=${encodeURIComponent(c.key)}`}
+              className="tm-cat"
+              style={{ ["--c1" as any]: c.c1, ["--c2" as any]: c.c2 }}
             >
-              {c.label}
-            </a>
+              <span className="tm-cat__icon" aria-hidden>{c.icon}</span>
+              <span className="tm-cat__label">{c.key}</span>
+            </Link>
           ))}
         </div>
-      </section>*/}
+      </section>
 
 {/* Próximos eventos */}
 <section className="home__section">
@@ -187,37 +198,10 @@ export default function Home() {
   ) : upcoming.length === 0 ? (
     <p className="u-mt-16 muted">No hay eventos publicados por ahora.</p>
   ) : (
-    <div className="events__grid">
-      {upcoming.map((ev) => {
-        // badge inteligente
-        const next = (ev.sessions ?? [])
-          .map(s => new Date(s.date).getTime())
-          .filter(t => t >= Date.now())
-          .sort((a,b) => a-b)[0];
-        const daysLeft = next ? Math.ceil((next - Date.now()) / (1000*60*60*24)) : null;
-
-        let badge: {text: string; variant: "hot"|"soon"|"featured"|null} = { text: "", variant: null };
-        if (ev.featured) badge = { text: "Destacado", variant: "featured" };
-        if (daysLeft !== null && daysLeft <= 2) badge = { text: "¡Mañana!", variant: "hot" };
-        else if (daysLeft !== null && daysLeft <= 7) badge = { text: "Esta semana", variant: "soon" };
-
-        return (
-          <div key={ev.id} className="event-card-wrap">
-            {/* overlay superior izquierdo */}
-            {badge.variant && <span className={`ec-badge ec-${badge.variant}`}>{badge.text}</span>}
-
-            {/* fecha corta sobre la imagen */}
-            {next && (
-              <span className="ec-date">
-                {new Date(next).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
-              </span>
-            )}
-
-            {/* tarjeta premium */}
-            <EventCard ev={ev} onClick={() => {}} />
-          </div>
-        );
-      })}
+    <div className="tm-grid">
+      {upcoming.map((ev) => (
+        <EventTile key={ev.id} ev={ev} />
+      ))}
     </div>
   )}
 </section>

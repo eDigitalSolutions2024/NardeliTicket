@@ -160,7 +160,16 @@ export default function CheckoutSuccess() {
       }
     }
 
-    tryFetchTickets();
+    // Confirma el pago con el backend (red de seguridad si el webhook no llegó),
+    // luego empieza a buscar los boletos.
+    (async () => {
+      try {
+        await api.get(`/checkout/orders/${orderId}/status`);
+      } catch {
+        /* si falla, seguimos con el polling normal */
+      }
+      if (!cancelled) tryFetchTickets();
+    })();
     return () => {
       cancelled = true;
     };

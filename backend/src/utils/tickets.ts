@@ -96,15 +96,18 @@ export async function ensureTicketPdf({
   const file = ticketFilePath(ticketId);
   if (fs.existsSync(file)) return file;
 
-  const NAVY = "#0c3c73";
-  const GRAY = "#6b7280";
-  const BORDER = "#e5e7eb";
-
   const eventName =
     order?.eventName || order?.event?.title || order?.event?.name || "Evento";
   const eventDate = order?.eventDate || order?.event?.date || order?.date;
   const eventPlace =
     order?.eventPlace || order?.event?.location || order?.event?.lugar || "";
+
+  // ¿Es admisión general? (sin silla ni mesa)
+  const isGeneral =
+    seat?.general === true ||
+    String(seat?.zoneId ?? "").toUpperCase() === "GENERAL";
+  const ticketNumber: number | undefined = seat?.ticketNumber;
+  const ticketTotal: number | undefined = seat?.ticketTotal;
 
   const zona = seat?.zoneId || seat?.zone || seat?.section || "-";
   const mesaRaw =
@@ -136,7 +139,7 @@ const asiento =
       : undefined;
 
   const logoPathFromEnv = process.env.LOGO_PATH;
-  const defaultLogoPath = path.join(__dirname, "logo-nardeli.png");
+  const defaultLogoPath = path.join(__dirname, "nardeli-mark-white.png");
   const logoPath = fs.existsSync(logoPathFromEnv || "")
     ? (logoPathFromEnv as string)
     : fs.existsSync(defaultLogoPath)
@@ -151,148 +154,155 @@ const asiento =
     scale: 6,
   });
 
+  // Paleta de marca (morado)
+  const PURPLE1 = "#6d28d9";
+  const PURPLE2 = "#a855f7";
+  const INK = "#1a1229";
+  const MUTED = "#6b6880";
+  const PAGEBG = "#efeaf7";
+  const LINE = "#ded4ef";
+
   await new Promise<void>((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A6", margin: 18 });
+    const doc = new PDFDocument({ size: [330, 540], margin: 0 });
     const out = fs.createWriteStream(file);
     doc.pipe(out);
 
-    // Header
-    const headerH = 42;
-    doc
-      .roundedRect(18, 18, doc.page.width - 36, headerH, 8)
-      .fillOpacity(0.06)
-      .fill(NAVY)
-      .fillOpacity(1);
+    const W = doc.page.width;
+    const H = doc.page.height;
 
-    let logoW = 0;
-    try {
-      if (logoPath) {
-        const targetH = 28;
-        doc.image(logoPath, 26, 25, { height: targetH });
-        logoW = targetH * 2;
-      }
-    } catch {}
-
-    doc
-      .fillColor(NAVY)
-      .fontSize(16)
-      .text("NardeliTicket", 26 + (logoW ? logoW + 6 : 0), 26, {
-        width: doc.page.width - 26 * 2 - (logoW ? logoW + 6 : 0),
-        align: "left",
-      });
-
-    doc
-      .fillColor(GRAY)
-      .fontSize(10)
-      .text(`Folio: #${order?._id || "—"}`, 26 + (logoW ? logoW + 6 : 0), 26 + 18);
+    // Fondo
+    doc.rect(0, 0, W, H).fill(PAGEBG);
 
     // Tarjeta
-    const cardY = 18 + headerH + 10;
-    const cardX = 18;
-    const cardW = doc.page.width - 36;
-    const cardH = 190; // un poquito más alto para texto
-    doc
-      .roundedRect(cardX, cardY, cardW, cardH, 10)
-      .lineWidth(1.2)
-      .strokeColor(BORDER)
-      .stroke();
+    const pad = 16;
+    const cardX = pad;
+    const cardY = pad;
+    const cardW = W - pad * 2;
+    const cardH = H - pad * 2;
+    const R = 20;
+    doc.roundedRect(cardX, cardY, cardW, cardH, R).fill("#ffffff");
 
-    // Título del evento
-    doc
-      .fillColor("#111827")
-      .fontSize(14)
-      .text(eventName, cardX + 12, cardY + 10, {
-        width: cardW - 24,
-        align: "left",
-      });
+    // --- Encabezado con gradiente (esquinas superiores redondeadas) ---
+    const headerH = 96;
+    doc.save();
+    doc.roundedRect(cardX, cardY, cardW, headerH + R, R).clip();
+    const grad = doc.linearGradient(cardX, cardY, cardX + cardW, cardY + headerH);
+    grad.stop(0, PURPLE1).stop(1, PURPLE2);
+    doc.rect(cardX, cardY, cardW, headerH).fill(grad);
+    doc.restore();
 
-    // Separador
-    doc
-      .moveTo(cardX + 12, cardY + 34)
-      .lineTo(cardX + cardW - 12, cardY + 34)
-      .lineWidth(1)
-      .strokeColor(BORDER)
-      .stroke();
-
-    // --- Layout de columnas dinámicas ---
-    const leftX = cardX + 12;
-    const rightX = cardX + cardW / 2;
-    const colWidth = (cardW - 24) / 2 - 4; // ancho de cada columna
-    let y = cardY + 44;
-
-    // Dibuja un label + valor y devuelve la altura usada
-    function drawField(
-      label: string,
-      value: string | undefined,
-      x: number,
-      yPos: number
-    ) {
-      const txt = value || "-";
-
-      // Label
-      doc.fillColor(GRAY).fontSize(9).text(label, x, yPos, {
-        width: colWidth,
-      });
-      const labelH = doc.heightOfString(label, { width: colWidth });
-
-      // Valor
-      doc
-        .fillColor("#111827")
-        .fontSize(11)
-        .text(txt, x, yPos + labelH + 1, {
-          width: colWidth,
-        });
-      const valueH = doc.heightOfString(txt, { width: colWidth });
-
-      return labelH + 1 + valueH;
-    }
-
-    // Dibuja una fila de hasta 2 columnas y aumenta "y"
-    function twoColsRow(
-      labelLeft: string,
-      valueLeft: string | undefined,
-      labelRight?: string,
-      valueRight?: string
-    ) {
-      const hLeft = drawField(labelLeft, valueLeft, leftX, y);
-      let hRight = 0;
-
-      if (labelRight) {
-        hRight = drawField(labelRight, valueRight, rightX, y);
+    // Logo + marca
+    let brandX = cardX + 20;
+    try {
+      if (logoPath) {
+        doc.image(logoPath, cardX + 20, cardY + 26, { height: 44 });
+        brandX = cardX + 20 + 54;
       }
+    } catch {}
+    doc
+      .fillColor("#ffffff")
+      .font("Helvetica-Bold")
+      .fontSize(19)
+      .text("NardeliTicket", brandX, cardY + 30);
+    doc
+      .fillColor("#ecdcff")
+      .font("Helvetica")
+      .fontSize(8)
+      .text("BOLETO DE ACCESO", brandX, cardY + 55, { characterSpacing: 2 });
 
-      y += Math.max(hLeft, hRight) + 8; // espacio entre filas
+    // --- Título del evento ---
+    let y = cardY + headerH + 20;
+    doc
+      .fillColor(INK)
+      .font("Helvetica-Bold")
+      .fontSize(17)
+      .text(eventName, cardX + 20, y, { width: cardW - 40 });
+    y += doc.heightOfString(eventName, { width: cardW - 40 }) + 12;
+
+    // Línea de acento
+    doc.rect(cardX + 20, y, 48, 3).fill(PURPLE2);
+    y += 18;
+
+    // --- Campos ---
+    const leftX = cardX + 20;
+    const rightX = cardX + cardW / 2 + 6;
+    const colWidth = (cardW - 40) / 2 - 8;
+
+    function drawField(label: string, value: string | undefined, x: number, yPos: number) {
+      const txt = value || "-";
+      doc
+        .fillColor(MUTED)
+        .font("Helvetica")
+        .fontSize(8)
+        .text(label.toUpperCase(), x, yPos, { width: colWidth, characterSpacing: 1 });
+      const labelH = doc.heightOfString(label.toUpperCase(), { width: colWidth, characterSpacing: 1 });
+      doc
+        .fillColor(INK)
+        .font("Helvetica-Bold")
+        .fontSize(11)
+        .text(txt, x, yPos + labelH + 2, { width: colWidth });
+      const valueH = doc.heightOfString(txt, { width: colWidth });
+      return labelH + 2 + valueH;
     }
 
-    // ---- Filas de datos ----
+    function twoColsRow(l1: string, v1: string | undefined, l2?: string, v2?: string) {
+      const h1 = drawField(l1, v1, leftX, y);
+      let h2 = 0;
+      if (l2) h2 = drawField(l2, v2, rightX, y);
+      y += Math.max(h1, h2) + 12;
+    }
+
     twoColsRow("Fecha", fmtDate(eventDate), "Lugar", eventPlace || "-");
-    twoColsRow("Zona", String(zona), "Mesa", String(mesa));
-    // Sin precio: solo mostramos asiento en la tercera fila
-    twoColsRow("Asiento", String(asiento));
+    if (isGeneral) {
+      const boletoStr =
+        ticketNumber && ticketTotal ? `Boleto ${ticketNumber} de ${ticketTotal}` : "—";
+      twoColsRow("Tipo de acceso", "Admisión general", "Boleto", boletoStr);
+      if (typeof precio === "number") twoColsRow("Precio", money(precio));
+    } else {
+      twoColsRow("Zona", String(zona), "Mesa", String(mesa));
+      twoColsRow("Asiento", String(asiento), typeof precio === "number" ? "Precio" : undefined, typeof precio === "number" ? money(precio) : undefined);
+    }
 
-    // Texto inferior de la tarjeta
+    // --- Perforación (estilo stub) ---
+    const perfY = cardY + cardH - 216;
+    doc.circle(cardX, perfY, 9).fill(PAGEBG);
+    doc.circle(cardX + cardW, perfY, 9).fill(PAGEBG);
     doc
-      .fillColor(GRAY)
-      .fontSize(9)
-      .text("Presenta este boleto en el acceso.", cardX + 12, cardY + cardH - 18, {
-        width: cardW - 24,
-        align: "left",
-      });
+      .save()
+      .moveTo(cardX + 14, perfY)
+      .lineTo(cardX + cardW - 14, perfY)
+      .lineWidth(1.5)
+      .dash(4, { space: 4 })
+      .strokeColor(LINE)
+      .stroke()
+      .undash()
+      .restore();
 
-    // QR
-    const qrSize = 120;
-    const qrY = cardY + cardH + 18;
-    const qrX = (doc.page.width - qrSize) / 2;
+    // --- Stub: folio + QR ---
+    doc
+      .fillColor(MUTED)
+      .font("Helvetica")
+      .fontSize(8)
+      .text("FOLIO", cardX + 20, perfY + 16, { characterSpacing: 2 });
+    doc
+      .fillColor(INK)
+      .font("Helvetica-Bold")
+      .fontSize(10)
+      .text(`#${order?._id || "—"}`, cardX + 20, perfY + 28, { width: cardW - 40 });
+
+    const qrSize = 132;
+    const qrX = cardX + (cardW - qrSize) / 2;
+    const qrY = perfY + 50;
     doc.image(qrBuf, qrX, qrY, { width: qrSize, height: qrSize });
 
     doc
-      .fillColor(GRAY)
-      .fontSize(9)
-
-    // Footer
-    doc
-      .fillColor(GRAY)
-      .fontSize(9)
+      .fillColor(MUTED)
+      .font("Helvetica")
+      .fontSize(8.5)
+      .text("Escanea el código o presenta este boleto en el acceso.", cardX + 20, qrY + qrSize + 10, {
+        width: cardW - 40,
+        align: "center",
+      });
 
     doc.end();
     out.on("finish", resolve);

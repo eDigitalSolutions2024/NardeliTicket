@@ -2,60 +2,7 @@ import { Request, Response } from "express";
 import { stripe } from "../utils/stripe";
 import Order from "../models/Order";
 import SeatHold from "../models/SeatHold";
-import { nanoid } from "nanoid";
-
-// 👇 NUEVO: emite tickets a partir de order.items[].seatIds (idempotente)
-async function issueTicketsForOrder(orderId: string) {
-  const order = await Order.findById(orderId);
-  if (!order) return;
-
-  // Si ya existen tickets, no duplicar
-  if (order.tickets && order.tickets.length) return;
-
-  const tickets: any[] = [];
-  let genIndex = 0;
-  for (const it of order.items || []) {
-    const { zoneId, tableId, seatIds = [], quantity } = it as any;
-
-    if (Array.isArray(seatIds) && seatIds.length) {
-      // Evento con asientos (seated)
-      for (const seatId of seatIds) {
-        tickets.push({
-          ticketId: `${orderId}-${seatId}-${nanoid(6)}`,
-          seatId,
-          tableId,
-          zoneId,
-          status: "issued",
-          issuedAt: new Date(),
-        });
-      }
-    } else {
-      // Admisión general: emitir N boletos genéricos por cantidad
-      const qty = Number.isFinite(Number(quantity)) ? Math.floor(Number(quantity)) : 0;
-      for (let i = 0; i < qty; i++) {
-        genIndex++;
-        tickets.push({
-          ticketId: `${orderId}-GEN-${genIndex}-${nanoid(6)}`,
-          seatId: `GEN-${genIndex}`,
-          tableId: tableId || "GENERAL",
-          zoneId: zoneId || "GENERAL",
-          status: "issued",
-          issuedAt: new Date(),
-        });
-      }
-    }
-  }
-
-  order.tickets = tickets;
-  order.status = "paid";
-  order.paidAt = new Date();
-  order.statusTimeline = [
-    ...(order.statusTimeline || []),
-    { status: "paid", at: new Date() },
-  ];
-
-  await order.save();
-}
+import { fulfillPaidOrder } from "../utils/fulfillOrder";
 
 export const stripeWebhook = async (req: Request, res: Response) => {
   const sig = req.headers["stripe-signature"] as string;
@@ -76,20 +23,8 @@ export const stripeWebhook = async (req: Request, res: Response) => {
       const orderId = session.metadata?.orderId as string | undefined;
 
       if (orderId) {
-        // Actualiza la orden como pagada
-        await Order.findByIdAndUpdate(orderId, {
-          status: "paid",
-          paidAt: new Date(),
-          "stripe.paymentIntentId": session.payment_intent,
-        });
-
-        await issueTicketsForOrder(orderId);
-
-        // Marca los holds de esa orden como vendidos
-        await SeatHold.updateMany(
-          { orderId, status: { $in: ["active", "attached_to_order"] } },
-          { $set: { status: "sold" } }
-        );
+        // Marca la orden como pagada, emite boletos y vende holds (idempotente)
+        await fulfillPaidOrder(orderId, { paymentIntentId: session.payment_intent });
       }
       break;
     }

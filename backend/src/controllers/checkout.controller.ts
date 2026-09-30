@@ -15,6 +15,7 @@ import {
 } from "../utils/tickets";
 import { printNardeliTicket, NardeliTicketPayload } from "../utils/zebraPrinter";
 import { numToLetter, tableLabelFromTableId } from "../utils/seatLabel";
+import { fulfillPaidOrder } from "../utils/fulfillOrder";
 import { nanoid } from "nanoid";
 
 
@@ -360,7 +361,7 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
           mode: "payment",
           line_items,
           metadata: { orderId, eventId },
-          success_url: `${process.env.PUBLIC_URL}/checkout/success?orderId=${orderId}`,
+          success_url: `${process.env.PUBLIC_URL}/checkout/success?orderId=${orderId}&pm=card&session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${process.env.PUBLIC_URL}/checkout/cancel?order=${orderId}`,
         });
 
@@ -539,7 +540,7 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
         mode: "payment",
         line_items,
         metadata: { orderId, eventId },
-        success_url: `${process.env.PUBLIC_URL}/checkout/success?orderId=${orderId}`,
+        success_url: `${process.env.PUBLIC_URL}/checkout/success?orderId=${orderId}&pm=card&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.PUBLIC_URL}/checkout/cancel?order=${orderId}`,
         // customer_email: req.user?.email,
       });
@@ -840,9 +841,17 @@ export async function streamSingleTicketPdf(req: Request, res: Response) {
 
     doc.fontSize(12).fillColor("#333");
     doc.text(`Ticket ID: ${ticket.ticketId}`, cardX + 12, cardY + 40);
-    doc.text(`Zona: ${ticket.zoneId}`, cardX + 12, cardY + 58);
-    doc.text(`Mesa: ${ticket.tableId}`, cardX + 12, cardY + 76);
-    doc.text(`Asiento: ${ticket.seatId}`, cardX + 12, cardY + 94);
+    const isGeneralTicket =
+      String((ticket as any).zoneId ?? "").toUpperCase() === "GENERAL" ||
+      (order as any).admissionType === "general";
+    if (isGeneralTicket) {
+      doc.text(`Tipo de acceso: Admisión general`, cardX + 12, cardY + 58);
+      doc.text(`Presenta este boleto en el acceso.`, cardX + 12, cardY + 76);
+    } else {
+      doc.text(`Zona: ${ticket.zoneId}`, cardX + 12, cardY + 58);
+      doc.text(`Mesa: ${ticket.tableId}`, cardX + 12, cardY + 76);
+      doc.text(`Asiento: ${ticket.seatId}`, cardX + 12, cardY + 94);
+    }
 
     const qrBuf = await toQrBuf(verifyUrl);
     const qrSize = 170;
@@ -892,16 +901,16 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
       const orderForPdf = { ...order, eventName, eventDate, eventPlace };
       const pricePesos = event ? generalPriceCents(event) / 100 : undefined;
 
-      for (const t of genTickets as any[]) {
+      const genTotal = (genTickets as any[]).length;
+      for (let i = 0; i < (genTickets as any[]).length; i++) {
+        const t = (genTickets as any[])[i];
         await ensureTicketPdf({
           ticketId: t.ticketId,
           order: orderForPdf,
           seat: {
-            zoneId: "GENERAL",
-            tableLabel: "-",
-            seatLabel: undefined,
-            tableId: "GENERAL",
-            seatId: t.seatId,
+            general: true,
+            ticketNumber: i + 1,
+            ticketTotal: genTotal,
             price: pricePesos,
           },
         });
@@ -1052,4 +1061,44 @@ console.log("DEBUG seatForPdf ->", seatForPdf);
       .json({ message: "No se pudieron generar los PDFs", detail: e.message });
   }
   
+}
+
+/**
+ * GET /api/checkout/orders/:orderId/status
+ * Confirma el pago directamente con Stripe (red de seguridad si el webhook
+ * no llegó, p. ej. en local sin Stripe CLI) y finaliza la orden si está pagada.
+ */
+export async function getOrderStatus(req: Request, res: Response) {
+  try {
+    const { orderId } = req.params;
+    const order = await Order.findById(orderId).lean();
+    if (!order) return res.status(404).json({ message: "Orden no encontrada" });
+
+    if (order.status !== "paid" && (order as any)?.stripe?.checkoutSessionId) {
+      try {
+        const session = await stripe.checkout.sessions.retrieve(
+          (order as any).stripe.checkoutSessionId
+        );
+        if (session.payment_status === "paid") {
+          await fulfillPaidOrder(String(orderId), {
+            paymentIntentId: (session.payment_intent as string) || undefined,
+          });
+        }
+      } catch (e) {
+        console.error("getOrderStatus retrieve error:", e);
+      }
+    }
+
+    const fresh = await Order.findById(orderId).lean();
+    const ticketCount = (fresh?.tickets || []).filter(
+      (t: any) => t.status !== "void"
+    ).length;
+    return res.json({
+      status: fresh?.status,
+      paid: fresh?.status === "paid",
+      ticketCount,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ message: "Error consultando estado", detail: e.message });
+  }
 }

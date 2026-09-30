@@ -2,6 +2,30 @@ import { Request, Response } from "express";
 import { Event } from "../models/Event";
 import SeatHold from "../models/SeatHold";
 
+/**
+ * Normaliza la config de admisión general.
+ * - price: pesos (>= 0)
+ * - priceCents: se deriva de price
+ * - capacity: null => cupo ilimitado; número >= 0 => cupo máximo
+ */
+function normalizeGeneralAdmission(input: any) {
+  const price = Math.max(0, Number(input?.price ?? 0)) || 0;
+
+  // capacity: acepta null / "" / undefined como ilimitado
+  let capacity: number | null = null;
+  const rawCap = input?.capacity;
+  if (rawCap !== null && rawCap !== undefined && rawCap !== "") {
+    const n = Number(rawCap);
+    if (Number.isFinite(n) && n >= 0) capacity = Math.floor(n);
+  }
+
+  return {
+    price,
+    priceCents: Math.round(price * 100),
+    capacity,
+  };
+}
+
 
 /** GET /api/events */
 export async function listEvents(req: Request, res: Response) {
@@ -47,8 +71,10 @@ export async function createEvent(req: Request, res: Response) {
       status,           // ⬅️ NUEVO
       featured,         // ⬅️ NUEVO
       pricing,
-      disabledTables, 
+      disabledTables,
       disabledSeats,
+      admissionType,        // ⬅️ NUEVO: "seated" | "general"
+      generalAdmission,     // ⬅️ NUEVO: { price, capacity }
     } = req.body || {};
 
     if (!title || !venue || !city || !imageUrl) {
@@ -72,6 +98,12 @@ export async function createEvent(req: Request, res: Response) {
       ? disabledSeats.map((s: any) => String(s)).filter(Boolean)
       : [];
 
+    // ⬅️ NUEVO: tipo de admisión + config de admisión general
+    const normalizedAdmissionType =
+      admissionType === "general" ? "general" : "seated";
+
+    const normalizedGeneral = normalizeGeneralAdmission(generalAdmission);
+
     const ev = await Event.create({
       title,
       venue,
@@ -83,6 +115,9 @@ export async function createEvent(req: Request, res: Response) {
       featured: !!featured,   // ⬅️ guarda featured
       pricing: normalizedPricing, // ⬅️ NUEVO
       disabledTables: normalizedDisabledTables,
+      disabledSeats: normalizedDisabledSeats,
+      admissionType: normalizedAdmissionType,
+      generalAdmission: normalizedGeneral,
     });
 
     res.status(201).json(ev);
@@ -104,7 +139,8 @@ export async function updateEvent(req: Request, res: Response) {
       pricing,
       disabledTables,           // ⬅️ NUEVO { vip, oro }
       disabledSeats,
-      
+      admissionType,            // ⬅️ NUEVO
+      generalAdmission,         // ⬅️ NUEVO
     } = req.body || {};
 
     const update: any = {};
@@ -135,6 +171,16 @@ export async function updateEvent(req: Request, res: Response) {
       update.disabledSeats = Array.isArray(disabledSeats)
         ? disabledSeats.map((s: any) => String(s)).filter(Boolean)
         : [];
+    }
+
+    // ⬅️ NUEVO: tipo de admisión
+    if (admissionType !== undefined) {
+      update.admissionType = admissionType === "general" ? "general" : "seated";
+    }
+
+    // ⬅️ NUEVO: config de admisión general (reemplaza el subdocumento completo)
+    if (generalAdmission !== undefined) {
+      update.generalAdmission = normalizeGeneralAdmission(generalAdmission);
     }
 
 

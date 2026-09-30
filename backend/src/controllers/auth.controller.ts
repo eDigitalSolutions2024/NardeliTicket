@@ -33,7 +33,7 @@ function setRefreshCookie(res: Response, token: string) {
 
 /* --------------------------- REGISTER --------------------------- */
 export async function register(req: Request, res: Response) {
-  const { name, email, password, role } = req.body || {};
+  const { name, email, password } = req.body || {};
   if (!name || !email || !password) {
     return res.status(400).json({ error: "Missing fields" });
   }
@@ -42,11 +42,13 @@ export async function register(req: Request, res: Response) {
   if (exists) return res.status(409).json({ error: "Email already registered" });
 
   const passwordHash = await hashPassword(password);
+  // El registro público SIEMPRE crea usuarios normales.
+  // Los admins se crean con el script seed:admin o promoviendo desde la BD.
   const user = await User.create({
     name,
     email,
     passwordHash,
-    role: role === "admin" ? "admin" : "user",
+    role: "user",
   });
 
   const accessToken = signAccessToken({ sub: user._id.toString(), role: user.role });

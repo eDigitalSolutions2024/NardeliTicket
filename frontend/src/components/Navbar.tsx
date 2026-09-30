@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import "./Navbar.css";
 import { useAuth } from "../auth/AuthProviders"; // ⬅️ usa el provider nuevo
+import logoWhite from "../assets/nardeli-mark-white.png";
 
 const BRAND = "NardeliTicket";
 
@@ -54,7 +55,7 @@ export default function Navbar() {
     const params = new URLSearchParams(window.location.search);
     query ? params.set("q", query) : params.delete("q");
     params.delete("page");
-    navigate({ pathname: "/", search: params.toString() });
+    navigate({ pathname: "/home", search: params.toString() });
     setMenuOpen(false);
   };
 
@@ -70,11 +71,11 @@ export default function Navbar() {
       <div className="nv__inner">
         <div className="nv__left">
           <button className="nv__burger" aria-label="Abrir menú" onClick={() => setMenuOpen(v => !v)}>☰</button>
-          <Link to="/" className="nv__brand" onClick={() => setMenuOpen(false)}>
-            <span className="nv__logo" aria-hidden>🎟️</span>{BRAND}
+          <Link to="/home" className="nv__brand" onClick={() => setMenuOpen(false)}>
+            <img className="nv__logo" src={logoWhite} alt="Nardeli" />{BRAND}
           </Link>
           <nav className={`nv__links ${menuOpen ? "is-open" : ""}`}>
-            <Link to="/" onClick={() => setMenuOpen(false)}>Inicio</Link>
+            <Link to="/home" onClick={() => setMenuOpen(false)}>Inicio</Link>
             <Link to="/events" onClick={() => setMenuOpen(false)}>Eventos</Link>
             <Link to="/categories" onClick={() => setMenuOpen(false)}>Categorías</Link>
           </nav>
@@ -125,7 +126,7 @@ export default function Navbar() {
                             onClick={async () => {
                               await logout();
                               setOpenUserMenu(false);
-                              navigate("/");
+                              navigate("/home");
                             }}
                           >
                             Cerrar sesión

@@ -97,7 +97,8 @@ export default function EventsPage() {
   };
 
   return (
-    <main className="u-container" style={{ paddingTop: 16, paddingBottom: 32 }}>
+    <main className="home u-container" style={{ paddingTop: 16, paddingBottom: 32 }}>
+      <div className="page-backdrop" aria-hidden />
       <h1 style={{ margin: "8px 0 16px 0" }}>Eventos</h1>
       {q && (
         <p style={{ marginTop: -6, color: "#64748b" }}>

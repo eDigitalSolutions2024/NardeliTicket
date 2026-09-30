@@ -1,6 +1,6 @@
 // src/routes/admin.sales.routes.ts
 import { Router } from "express";
-import { requireAuth } from "../middlewares/requireAuth"; // export nombrado
+import { requireAuth, requireAdmin } from "../middlewares/requireAuth"; // exports nombrados
 import Order from "../models/Order";                      // default export (según tu modelo)
 import { Event } from "../models/Event";                  // named export
 import { User } from "../models/User";                    // named export
@@ -53,7 +53,7 @@ const upload = multer({
  * body: FormData con field "file"
  * resp: { url: string }
  */
-router.post("/upload-event-image", upload.single("file"), (req, res) => {
+router.post("/upload-event-image", requireAuth, requireAdmin, upload.single("file"), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No se recibió archivo." });
@@ -113,7 +113,7 @@ type OrderLean = {
   paidAt?: Date;
 };
 
-router.get("/sales", requireAuth, async (req, res) => {
+router.get("/sales", requireAuth, requireAdmin, async (req, res) => {
   try {
     const { from, to, eventId, status, q } = req.query as {
       from?: string;

@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import "./Carousel.css";
 
 export type Slide = {
   image: string;
@@ -6,155 +8,114 @@ export type Slide = {
   subtitle?: string;
   ctaText?: string;
   ctaHref?: string;
+  eyebrow?: string;
 };
 
 type Props = {
   slides: Slide[];
-  intervalMs?: number; // default 4000
-  height?: number;     // px, default 360
-  rounded?: boolean;   // default true
+  intervalMs?: number; // default 5500
+  height?: number; // px (desktop)
 };
 
-export default function SimpleCarousel({
-  slides,
-  intervalMs = 4000,
-  height = 360,
-  rounded = true,
-}: Props) {
+export default function SimpleCarousel({ slides, intervalMs = 5500, height = 520 }: Props) {
   const [idx, setIdx] = useState(0);
   const timer = useRef<number | null>(null);
   const paused = useRef(false);
 
-  const go = (n: number) => setIdx((_p) => (n + slides.length) % slides.length);
+  const n = slides.length;
+  const go = (i: number) => setIdx(((i % n) + n) % n);
   const next = () => go(idx + 1);
   const prev = () => go(idx - 1);
 
   useEffect(() => {
-    if (paused.current) return;
-    timer.current = window.setInterval(() => {
-      setIdx((p) => (p + 1) % slides.length);
-    }, intervalMs);
+    if (n <= 1) return;
+    const tick = () => {
+      if (!paused.current) setIdx((p) => (p + 1) % n);
+    };
+    timer.current = window.setInterval(tick, intervalMs);
     return () => {
       if (timer.current) window.clearInterval(timer.current);
-      timer.current = null;
     };
-  }, [idx, intervalMs, slides.length]);
+  }, [intervalMs, n]);
+
+  if (n === 0) {
+    return (
+      <div className="carousel" style={{ ["--carousel-h" as any]: `${height}px` }}>
+        <div className="carousel__scrim" />
+        <div className="carousel__caption">
+          <span className="carousel__eyebrow">Próximamente</span>
+          <h2 className="carousel__title">Aún no hay eventos destacados</h2>
+          <p className="carousel__subtitle">Vuelve pronto para descubrir los próximos shows.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
-      style={{
-        position: "relative",
-        height,
-        borderRadius: rounded ? 16 : 0,
-        overflow: "hidden",
-        background: "#0b1220",
-      }}
+      className="carousel"
+      style={{ ["--carousel-h" as any]: `${height}px` }}
       onMouseEnter={() => (paused.current = true)}
       onMouseLeave={() => (paused.current = false)}
+      aria-roledescription="carousel"
     >
       {slides.map((s, i) => (
         <div
           key={i}
-          style={{
-            position: "absolute",
-            inset: 0,
-            transition: "opacity 500ms ease",
-            opacity: i === idx ? 1 : 0,
-          }}
+          className={`carousel__slide ${i === idx ? "is-active" : ""}`}
           aria-hidden={i !== idx}
         >
-          <img
-            src={s.image}
-            alt={s.title || `slide-${i + 1}`}
-            style={{ width: "100%", height: "100%", objectFit: "cover", filter: "brightness(0.85)" }}
-            loading="eager"
-          />
-          {(s.title || s.subtitle || s.ctaText) && (
-            <div
-              style={{
-                position: "absolute",
-                left: 24,
-                bottom: 24,
-                color: "#fff",
-                textShadow: "0 2px 10px rgba(0,0,0,.35)",
-                maxWidth: 640,
-              }}
-            >
-              {s.title && <h2 style={{ margin: 0, fontSize: 28, fontWeight: 800 }}>{s.title}</h2>}
-              {s.subtitle && <p style={{ margin: "6px 0 12px 0", fontSize: 16 }}>{s.subtitle}</p>}
-              {s.ctaText && s.ctaHref && (
-                <a
-                  href={s.ctaHref}
-                  style={{
-                    display: "inline-block",
-                    padding: "8px 14px",
-                    background: "#0ea5e9",
-                    color: "#fff",
-                    borderRadius: 8,
-                    textDecoration: "none",
-                    fontWeight: 700,
-                  }}
-                >
-                  {s.ctaText}
-                </a>
-              )}
-            </div>
-          )}
+          {/* fondo difuminado que rellena el banner */}
+          <img className="carousel__img carousel__img--blur" src={s.image} alt="" aria-hidden loading={i === 0 ? "eager" : "lazy"} />
+          {/* imagen completa sin recortes */}
+          <img className="carousel__img carousel__img--full" src={s.image} alt={s.title || `slide-${i + 1}`} loading={i === 0 ? "eager" : "lazy"} />
+          <div className="carousel__scrim" />
+
+          <div className="carousel__caption">
+            <span className="carousel__eyebrow">✦ {s.eyebrow || "Evento destacado"}</span>
+            {s.title && <h2 className="carousel__title">{s.title}</h2>}
+            {s.subtitle && <p className="carousel__subtitle">{s.subtitle}</p>}
+            {s.ctaHref && (
+              <Link to={s.ctaHref} className="carousel__cta btn btn-primary">
+                {s.ctaText || "Ver evento"}
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Link>
+            )}
+          </div>
         </div>
       ))}
 
-      {/* Controles */}
-      <button
-        onClick={prev}
-        aria-label="Anterior"
-        style={navBtnStyle("left")}
-      >
-        ◀
-      </button>
-      <button
-        onClick={next}
-        aria-label="Siguiente"
-        style={navBtnStyle("right")}
-      >
-        ▶
-      </button>
+      {n > 1 && (
+        <>
+          <button className="carousel__nav carousel__nav--prev" onClick={prev} aria-label="Anterior">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M15 6l-6 6 6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <button className="carousel__nav carousel__nav--next" onClick={next} aria-label="Siguiente">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
 
-      {/* Dots */}
-      <div style={{ position: "absolute", bottom: 12, width: "100%", textAlign: "center" }}>
-        {slides.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => go(i)}
-            aria-label={`Ir al slide ${i + 1}`}
-            style={{
-              width: 10,
-              height: 10,
-              margin: "0 4px",
-              borderRadius: 999,
-              border: "none",
-              background: i === idx ? "#fff" : "rgba(255,255,255,.5)",
-              cursor: "pointer",
-            }}
-          />
-        ))}
-      </div>
+          <div className="carousel__dots">
+            {slides.map((_, i) => (
+              <button
+                key={i}
+                className={`carousel__dot ${i === idx ? "is-active" : ""}`}
+                onClick={() => go(i)}
+                aria-label={`Ir al slide ${i + 1}`}
+              />
+            ))}
+          </div>
+
+          <div className="carousel__progress">
+            <span key={idx} style={{ animationDuration: `${intervalMs}ms` }} />
+          </div>
+        </>
+      )}
     </div>
   );
-}
-
-function navBtnStyle(side: "left" | "right"): React.CSSProperties {
-  return {
-    position: "absolute",
-    top: "50%",
-    transform: "translateY(-50%)",
-    [side]: 8,
-    background: "rgba(0,0,0,.45)",
-    color: "#fff",
-    border: "none",
-    borderRadius: 10,
-    width: 36,
-    height: 36,
-    cursor: "pointer",
-    fontSize: 16,
-  } as React.CSSProperties;
 }

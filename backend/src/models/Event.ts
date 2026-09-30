@@ -23,6 +23,18 @@ const PricingCentsSchema = new Schema(
   { _id: false }
 );
 
+// Configuración para eventos de ADMISIÓN GENERAL (sin layout de asientos)
+const GeneralAdmissionSchema = new Schema(
+  {
+    price:      { type: Number, min: 0, default: 0 }, // precio del boleto en MXN
+    priceCents: { type: Number, min: 0, default: 0 },
+    // capacity = null  => cupo ilimitado
+    // capacity = número => cupo máximo de boletos a vender
+    capacity:   { type: Number, min: 0, default: null },
+  },
+  { _id: false }
+);
+
 const EventSchema = new Schema(
   {
     title:    { type: String, required: true, index: "text" },
@@ -30,6 +42,13 @@ const EventSchema = new Schema(
     city:     { type: String, required: true },
     imageUrl: { type: String, required: true },
     category: { type: String, enum: ["Conciertos","Teatro","Deportes","Familiares","Especiales"] },
+    // "seated"  => venta con layout de mesas/asientos (comportamiento original)
+    // "general" => venta solo por cantidad de boletos (admisión general)
+    admissionType: { type: String, enum: ["seated", "general"], default: "seated" },
+    generalAdmission: {
+      type: GeneralAdmissionSchema,
+      default: () => ({ price: 0, priceCents: 0, capacity: null }),
+    },
     sessions: { type: [SessionSchema], default: [] },
     status:   { type: String, enum: ["draft","published"], default: "draft" },
     featured: { type: Boolean, default: false },

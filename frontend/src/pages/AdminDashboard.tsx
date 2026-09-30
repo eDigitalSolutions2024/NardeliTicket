@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createEvent, deleteEvent, fetchEvents, updateEvent } from "../api/events";
 import type { EventItem, EventSession, EventStatus } from "../types/Event";
 import { fetchSales, type TicketSale, type SalesQuery } from "../api/admin";
+import { api } from "../api/client";
 import { buildTables, TABLE_W, TABLE_H, TABLE_R, numToLetter, type TableGeom } from "../layout/salonLayout";
 import "../CSS/adminDashboard.css";
 
@@ -24,12 +25,6 @@ function statusLabel(s: string) {
   return map[s] ?? s;
 }
 
-/* ==== API base (frontend -> backend) ==== */
-const API =
-  ((import.meta as any).env?.VITE_API_URL
-    ? `${(import.meta as any).env.VITE_API_URL}/api`
-    : "http://localhost:4000/api");
-
 /* ==== dirección fija del salón ==== */
 const FIXED_VENUE = "Av. Waterfill 431, Waterfill Río Bravo, 32380"; // <- cámbialo si quieres
 const FIXED_CITY = "Ciudad Juárez, Chihuahua, México"; // <- cámbialo si quieres
@@ -49,6 +44,8 @@ const emptyForm: FormState = {
   pricing: { vip: 0, oro: 0 },
   disabledTables: [],
   disabledSeats: [],
+  admissionType: "seated",
+  generalAdmission: { price: 0, capacity: null },
 };
 
 /* ==== utils fechas ==== */
@@ -109,7 +106,6 @@ export default function AdminDashboard() {
   const [showLayoutModal, setShowLayoutModal] = useState(false);
 
   // 👇 nuevos estados para imagen
-  const [imageMode, setImageMode] = useState<"url" | "file">("url");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -138,23 +134,14 @@ export default function AdminDashboard() {
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch(`${API}/admin/upload-event-image`, {
-      method: "POST",
-      body: formData,
-      credentials: "include",
-    });
-
-    if (!res.ok) {
-      console.error("Upload error status:", res.status, res.statusText);
-      throw new Error("No se pudo subir la imagen");
-    }
-
-    const data = await res.json();
-    if (!data.url) {
+    // Usamos la instancia `api` para que adjunte el token Bearer (y maneje refresh).
+    // La subida requiere rol admin en el backend.
+    const { data } = await api.post("/admin/upload-event-image", formData);
+    if (!data?.url) {
       throw new Error("Respuesta inválida al subir imagen");
     }
 
-    return data.url;
+    return data.url as string;
   }
 
   // sesiones
@@ -192,12 +179,8 @@ function addSessionFromInput() {
       return;
     }
 
-    // Validación de imagen: ya sea URL o archivo
-    if (imageMode === "url" && !form.imageUrl) {
-      alert("Debes proporcionar la URL de la imagen.");
-      return;
-    }
-    if (imageMode === "file" && !imageFile && !form.imageUrl) {
+    // Validación de imagen: se requiere un archivo (o una imagen previa al editar)
+    if (!imageFile && !form.imageUrl) {
       alert("Debes seleccionar un archivo de imagen.");
       return;
     }
@@ -207,8 +190,8 @@ function addSessionFromInput() {
     try {
       let finalImageUrl = form.imageUrl;
 
-      // Si el modo es archivo y hay archivo, primero lo subimos
-      if (imageMode === "file" && imageFile) {
+      // Si se seleccionó un archivo, lo subimos primero
+      if (imageFile) {
         setUploadingImage(true);
         try {
           finalImageUrl = await uploadImageFile(imageFile);
@@ -235,6 +218,15 @@ function addSessionFromInput() {
         },
         disabledTables: form.disabledTables ?? [],
         disabledSeats: (form as any).disabledSeats ?? [],
+        admissionType: form.admissionType ?? "seated",
+        generalAdmission: {
+          price: Number(form.generalAdmission?.price ?? 0),
+          capacity:
+            form.generalAdmission?.capacity === null ||
+            form.generalAdmission?.capacity === undefined
+              ? null
+              : Number(form.generalAdmission.capacity),
+        },
       };
 
       if (isEditing && form.id) {
@@ -247,7 +239,6 @@ function addSessionFromInput() {
 
       setForm(emptyForm);
       setSessionInput("");
-      setImageMode("url");
       setImageFile(null);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -273,10 +264,14 @@ function addSessionFromInput() {
       pricing: { vip: ev.pricing?.vip ?? 0, oro: ev.pricing?.oro ?? 0 },
       disabledTables: ev.disabledTables ?? [],
       disabledSeats: (ev as any).disabledSeats ?? [],
+      admissionType: ev.admissionType ?? "seated",
+      generalAdmission: {
+        price: ev.generalAdmission?.price ?? 0,
+        capacity: ev.generalAdmission?.capacity ?? null,
+      },
       createdAt: ev.createdAt,
     });
     setSessionInput("");
-    setImageMode("url");
     setImageFile(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -361,6 +356,24 @@ function addSessionFromInput() {
           {/* FORM */}
           <form onSubmit={onSubmit} className="admin-form">
             <div className="grid">
+              <label style={{ gridColumn: "1 / -1" }}>
+                Tipo de venta
+                <select
+                  value={form.admissionType ?? "seated"}
+                  onChange={(e) =>
+                    setField("admissionType", e.target.value as "seated" | "general")
+                  }
+                >
+                  <option value="seated">Con asientos (mesas / sillas)</option>
+                  <option value="general">Admisión general (solo boletos)</option>
+                </select>
+                <small style={{ color: "#6b7280" }}>
+                  {form.admissionType === "general"
+                    ? "El cliente elige cuántos boletos comprar, sin mapa de asientos."
+                    : "El cliente elige asientos en el layout del salón."}
+                </small>
+              </label>
+
               <label>
                 Título *
                 <input
@@ -383,45 +396,14 @@ function addSessionFromInput() {
 
               <label>
                 Imagen *
-                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <input
-                      type="radio"
-                      name="imageMode"
-                      value="url"
-                      checked={imageMode === "url"}
-                      onChange={() => setImageMode("url")}
-                    />
-                    URL
-                  </label>
-                  <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    <input
-                      type="radio"
-                      name="imageMode"
-                      value="file"
-                      checked={imageMode === "file"}
-                      onChange={() => setImageMode("file")}
-                    />
-                    Archivo
-                  </label>
-                </div>
-
-                {imageMode === "url" ? (
-                  <input
-                    value={form.imageUrl}
-                    onChange={(e) => setField("imageUrl", e.target.value)}
-                    placeholder="https://..."
-                  />
-                ) : (
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] || null;
-                      setImageFile(file);
-                    }}
-                  />
-                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setImageFile(file);
+                  }}
+                />
               </label>
 
               <label>
@@ -452,37 +434,113 @@ function addSessionFromInput() {
                 </select>
               </label>
 
-              <label>
-                Precio VIP
-                <input
-                  type="number"
-                  min={0}
-                  value={form.pricing?.vip ?? 0}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      pricing: { ...(f.pricing ?? {}), vip: Number(e.target.value) },
-                    }))
-                  }
-                  placeholder="0"
-                />
-              </label>
+              {form.admissionType !== "general" && (
+                <>
+                  <label>
+                    Precio VIP
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.pricing?.vip ?? 0}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          pricing: { ...(f.pricing ?? {}), vip: Number(e.target.value) },
+                        }))
+                      }
+                      placeholder="0"
+                    />
+                  </label>
 
-              <label>
-                Precio Oro
-                <input
-                  type="number"
-                  min={0}
-                  value={form.pricing?.oro ?? 0}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      pricing: { ...(f.pricing ?? {}), oro: Number(e.target.value) },
-                    }))
-                  }
-                  placeholder="0"
-                />
-              </label>
+                  <label>
+                    Precio Oro
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.pricing?.oro ?? 0}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          pricing: { ...(f.pricing ?? {}), oro: Number(e.target.value) },
+                        }))
+                      }
+                      placeholder="0"
+                    />
+                  </label>
+                </>
+              )}
+
+              {form.admissionType === "general" && (
+                <>
+                  <label>
+                    Precio del boleto
+                    <input
+                      type="number"
+                      min={0}
+                      value={form.generalAdmission?.price ?? 0}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          generalAdmission: {
+                            price: Number(e.target.value),
+                            capacity: f.generalAdmission?.capacity ?? null,
+                          },
+                        }))
+                      }
+                      placeholder="0"
+                    />
+                  </label>
+
+                  <label>
+                    Cupo (boletos disponibles)
+                    <input
+                      type="number"
+                      min={0}
+                      value={
+                        form.generalAdmission?.capacity === null ||
+                        form.generalAdmission?.capacity === undefined
+                          ? ""
+                          : form.generalAdmission.capacity
+                      }
+                      disabled={
+                        form.generalAdmission?.capacity === null ||
+                        form.generalAdmission?.capacity === undefined
+                      }
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          generalAdmission: {
+                            price: f.generalAdmission?.price ?? 0,
+                            capacity: e.target.value === "" ? null : Number(e.target.value),
+                          },
+                        }))
+                      }
+                      placeholder="Sin límite"
+                    />
+                    <label
+                      style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, fontWeight: 400 }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={
+                          form.generalAdmission?.capacity === null ||
+                          form.generalAdmission?.capacity === undefined
+                        }
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            generalAdmission: {
+                              price: f.generalAdmission?.price ?? 0,
+                              capacity: e.target.checked ? null : 0,
+                            },
+                          }))
+                        }
+                      />
+                      <span style={{ fontSize: 13 }}>Sin límite de cupo</span>
+                    </label>
+                  </label>
+                </>
+              )}
 
               <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <input
@@ -515,7 +573,8 @@ function addSessionFromInput() {
               </div>
             )}
 
-            {/* Layout / Mesas deshabilitadas */}
+            {/* Layout / Mesas deshabilitadas (solo eventos con asientos) */}
+            {form.admissionType !== "general" && (
             <div
               style={{
                 marginTop: 16,
@@ -559,6 +618,7 @@ function addSessionFromInput() {
                 )}
               </div>
             </div>
+            )}
 
 
             {/* Sesiones */}
@@ -623,7 +683,6 @@ function addSessionFromInput() {
                   onClick={() => {
                     setForm(emptyForm);
                     setSessionInput("");
-                    setImageMode("url");
                     setImageFile(null);
                   }}
                   className="btn-secondary"

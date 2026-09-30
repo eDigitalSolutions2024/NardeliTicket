@@ -15,11 +15,71 @@ import {
 } from "../utils/tickets";
 import { printNardeliTicket, NardeliTicketPayload } from "../utils/zebraPrinter";
 import { numToLetter, tableLabelFromTableId } from "../utils/seatLabel";
+import { nanoid } from "nanoid";
 
 
 
 // ---------- Utilidades de pricing (centavos) ----------
 const SERVICE_FEE_PCT = 5;
+
+/** Cantidad de boletos de un item: por asientos (seated) o por cantidad (general). */
+function itemQty(it: any): number {
+  if (Array.isArray(it?.seatIds) && it.seatIds.length) return it.seatIds.length;
+  const q = Number(it?.quantity);
+  return Number.isFinite(q) && q > 0 ? Math.floor(q) : 0;
+}
+
+/** Precio del boleto (centavos) para eventos de admisión general. */
+function generalPriceCents(eventDoc: any): number {
+  const c = eventDoc?.generalAdmission?.priceCents;
+  if (typeof c === "number" && c > 0) return c;
+  const p = eventDoc?.generalAdmission?.price;
+  if (typeof p === "number" && p > 0) return Math.round(p * 100);
+  return 0;
+}
+
+/** Genera N boletos genéricos (sin asiento) para una orden de admisión general. */
+function buildGeneralTickets(orderId: string, qty: number) {
+  const tickets: any[] = [];
+  for (let i = 0; i < qty; i++) {
+    tickets.push({
+      ticketId: `${orderId}-GEN-${i + 1}-${nanoid(6)}`,
+      seatId: `GEN-${i + 1}`,
+      tableId: "GENERAL",
+      zoneId: "GENERAL",
+      status: "issued",
+      issuedAt: new Date(),
+    });
+  }
+  return tickets;
+}
+
+/**
+ * Cantidad de boletos ya comprometidos (vendidos o reservados) de un evento
+ * de admisión general. Cuenta órdenes pagadas y pendientes de pago no expiradas.
+ */
+async function generalSoldQty(eventId: string): Promise<number> {
+  const now = Date.now();
+  const orders = await Order.find({
+    eventId,
+    status: { $in: ["paid", "pending_payment"] },
+  })
+    .select("status expiresAt items")
+    .lean();
+
+  let total = 0;
+  for (const o of orders as any[]) {
+    if (
+      o.status === "pending_payment" &&
+      o.expiresAt &&
+      new Date(o.expiresAt).getTime() < now
+    ) {
+      continue; // reserva expirada, ya no cuenta
+    }
+    for (const it of o.items || []) total += itemQty(it);
+  }
+  return total;
+}
 
 function zonePriceCentsFromEvent(eventDoc: any, zoneId: string): number {
   const key = String(zoneId || "").toLowerCase(); // "vip" | "oro"
@@ -31,6 +91,14 @@ function zonePriceCentsFromEvent(eventDoc: any, zoneId: string): number {
 }
 
 function priceCentsForItem(eventDoc: any, it: any): number {
+  // Admisión general: precio único del evento (con fallback al unitPrice del item)
+  if (eventDoc?.admissionType === "general") {
+    const g = generalPriceCents(eventDoc);
+    if (g > 0) return g;
+    const unit = Number(it?.unitPrice);
+    return Number.isFinite(unit) && unit > 0 ? Math.round(unit * 100) : 0;
+  }
+
   // 1) Intentar tomar del evento (pricingCents o pricing*100)
   const key = String(it?.zoneId || "").toLowerCase();
   const fromCents = eventDoc?.pricingCents?.[key];
@@ -50,7 +118,7 @@ function computePricingCents(eventDoc: any, items: Array<any>) {
   let subtotalCents = 0;
   for (const it of items) {
     const priceCents = priceCentsForItem(eventDoc, it);
-    const qty = Array.isArray(it.seatIds) ? it.seatIds.length : 0;
+    const qty = itemQty(it);
     subtotalCents += priceCents * qty;
   }
   const feesCents = Math.round((subtotalCents * SERVICE_FEE_PCT) / 100);
@@ -112,6 +180,26 @@ export const preflightCheckout = async (req: Request & { user?: any }, res: Resp
     // TODO (opcional): validar que asientos no estén vendidos / retenidos por otro usuario
 
     const pricing = computePricingCents(eventDoc, items);
+
+    // Admisión general: validar cupo disponible antes de mandar a pago
+    if ((eventDoc as any).admissionType === "general") {
+      const capacity = (eventDoc as any)?.generalAdmission?.capacity;
+      if (capacity !== null && capacity !== undefined) {
+        const requestedQty = items.reduce((acc: number, it: any) => acc + itemQty(it), 0);
+        const sold = await generalSoldQty(String(eventDoc._id));
+        const left = Math.max(0, Number(capacity) - sold);
+        if (requestedQty > left) {
+          return res.status(409).json({
+            error: "sold_out",
+            message:
+              left > 0
+                ? `Solo quedan ${left} boletos disponibles.`
+                : "Boletos agotados para este evento.",
+            available: left,
+          });
+        }
+      }
+    }
 
     // Si más adelante tienes holds previos, aquí devolverías holdGroupId/expiración real
     const now = Date.now();
@@ -198,7 +286,185 @@ export const createCheckout = async (req: Request & { user?: any }, res: Respons
         total: pricing.totalCents,
       },
       paymentMethod, // 👈 lo agregamos al modelo
+      admissionType: (eventDoc as any).admissionType || "seated",
     };
+
+    // ================================================================
+    // ADMISIÓN GENERAL: venta por cantidad de boletos (sin asientos)
+    // ================================================================
+    if ((eventDoc as any).admissionType === "general") {
+      const requestedQty = items.reduce((acc: number, it: any) => acc + itemQty(it), 0);
+      if (requestedQty <= 0) {
+        return res
+          .status(400)
+          .json({ error: "bad_request", message: "Debes elegir al menos un boleto." });
+      }
+
+      // Validar cupo (si no es ilimitado)
+      const capacity = (eventDoc as any)?.generalAdmission?.capacity;
+      if (capacity !== null && capacity !== undefined) {
+        const sold = await generalSoldQty(eventId);
+        if (sold + requestedQty > Number(capacity)) {
+          const left = Math.max(0, Number(capacity) - sold);
+          return res.status(409).json({
+            error: "sold_out",
+            message:
+              left > 0
+                ? `Solo quedan ${left} boletos disponibles.`
+                : "Boletos agotados para este evento.",
+            available: left,
+          });
+        }
+      }
+
+      const unitCents = priceCentsForItem(eventDoc, items[0] || {});
+
+      // ---------- GENERAL + TARJETA / STRIPE ----------
+      if (paymentMethod === "card") {
+        const order = await Order.create({
+          ...baseOrderData,
+          status: "pending_payment",
+          statusTimeline: [{ status: "pending_payment", at: now }],
+        });
+        const orderId: string = String(order._id as unknown as Types.ObjectId);
+
+        const line_items: any[] = [
+          {
+            quantity: requestedQty,
+            price_data: {
+              currency: "mxn",
+              unit_amount: unitCents,
+              product_data: {
+                name: `Boletos • ${(eventDoc as any).title || "Evento"}`,
+                metadata: { eventId, admissionType: "general" },
+              },
+            },
+          },
+        ];
+
+        if (pricing.feesCents > 0) {
+          line_items.push({
+            quantity: 1,
+            price_data: {
+              currency: "mxn",
+              unit_amount: pricing.feesCents,
+              product_data: {
+                name: `Tarifa de servicio (${pricing.servicePct ?? 5}%)`,
+                metadata: { kind: "service_fee", eventId },
+              },
+            },
+          });
+        }
+
+        const session = await stripe.checkout.sessions.create({
+          mode: "payment",
+          line_items,
+          metadata: { orderId, eventId },
+          success_url: `${process.env.PUBLIC_URL}/checkout/success?orderId=${orderId}`,
+          cancel_url: `${process.env.PUBLIC_URL}/checkout/cancel?order=${orderId}`,
+        });
+
+        order.stripe = { checkoutSessionId: session.id };
+        await order.save();
+
+        return res.json({ checkoutUrl: session.url, orderId });
+      }
+
+      // ---------- GENERAL + EFECTIVO (SOLO ADMIN / TAQUILLA) ----------
+      if (paymentMethod === "cash") {
+        if (!cashCustomer?.name || !cashCustomer.name.trim()) {
+          return res.status(400).json({
+            error: "bad_request",
+            message: "Para pago en efectivo es obligatorio el nombre del cliente.",
+          });
+        }
+
+        const amountGivenNum = Number(cashPayment?.amountGiven ?? 0);
+        const changeNum = Number(cashPayment?.change ?? 0);
+
+        const order = await Order.create({
+          ...baseOrderData,
+          status: "paid",
+          paidAt: now,
+          buyer: {
+            name: cashCustomer.name.trim(),
+            phone: cashCustomer.phone?.trim() || undefined,
+            email: cashCustomer.email?.trim() || undefined,
+          },
+          statusTimeline: [
+            { status: "pending_payment", at: now, note: "Orden creada para pago en efectivo" },
+            { status: "paid", at: now, note: "Pago en efectivo registrado en taquilla" },
+          ],
+          cashPayment:
+            cashPayment && !Number.isNaN(amountGivenNum)
+              ? {
+                  amountGiven: amountGivenNum,
+                  change: changeNum,
+                  registeredAt: now,
+                  cashierUserId: userId,
+                }
+              : undefined,
+        });
+
+        const orderId: string = String(order._id as unknown as Types.ObjectId);
+
+        // Emitir N boletos genéricos de inmediato (efectivo = pagado)
+        order.tickets = buildGeneralTickets(orderId, requestedQty) as any;
+        await order.save();
+
+        // Imprimir en Zebra (un boleto por entrada)
+        try {
+          const eventName: string =
+            (eventDoc as any)?.title || (eventDoc as any)?.name || "Evento Nardeli";
+
+          const eventDateRaw: any =
+            sessionDate ||
+            (eventDoc as any)?.sessions?.[0]?.date ||
+            (eventDoc as any)?.date ||
+            undefined;
+          const dateLabel: string = eventDateRaw
+            ? new Date(eventDateRaw).toLocaleString("es-MX", {
+                dateStyle: "medium",
+                timeStyle: "short",
+              })
+            : "-";
+
+          const eventPlace: string =
+            [(eventDoc as any)?.venue, (eventDoc as any)?.city].filter(Boolean).join(", ") || "";
+
+          const priceLabel = new Intl.NumberFormat("es-MX", {
+            style: "currency",
+            currency: "MXN",
+          }).format(pricing.totalCents / 100);
+
+          for (let i = 0; i < requestedQty; i++) {
+            const payload: NardeliTicketPayload = {
+              eventName,
+              dateLabel,
+              eventPlace,
+              orderFolio: orderId,
+              zone: "GENERAL",
+              tableLabel: "-",
+              seatLabels: [`Boleto ${i + 1}/${requestedQty}`],
+              buyerName: cashCustomer.name.trim(),
+              priceLabel,
+              ticketCode: `${orderId}-${i + 1}`,
+            };
+            await printNardeliTicket(payload);
+          }
+          console.log("✅ Boletos impresos en Zebra para orden general", orderId);
+        } catch (printErr) {
+          console.error("Error imprimiendo boletos en Zebra:", printErr);
+        }
+
+        const successUrl = `${process.env.PUBLIC_URL}/checkout/success?orderId=${orderId}`;
+        return res.json({ ok: true, orderId, successUrl });
+      }
+
+      return res
+        .status(400)
+        .json({ error: "invalid_payment_method", message: "Método de pago inválido" });
+    }
 
     // ----------------------------------------------------------------
     // CASO 1: TARJETA / STRIPE
@@ -609,6 +875,56 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
     }
 
     const event = order.eventId ? await Event.findById(order.eventId).lean() : null;
+
+    // ================================================================
+    // ADMISIÓN GENERAL: los boletos no tienen asiento; se generan desde
+    // order.tickets (emitidos por webhook en tarjeta o al cobrar en efectivo).
+    // ================================================================
+    if ((order as any).admissionType === "general" || (event as any)?.admissionType === "general") {
+      const genTickets = (order.tickets || []).filter((t: any) => t.status !== "void");
+      if (!genTickets.length) {
+        return res.status(400).json({ message: "No hay boletos emitidos para esta orden" });
+      }
+
+      const eventName = event?.title ?? "Evento";
+      const eventDate = (order as any).sessionDate ?? event?.sessions?.[0]?.date ?? undefined;
+      const eventPlace = [event?.venue, event?.city].filter(Boolean).join(", ");
+      const orderForPdf = { ...order, eventName, eventDate, eventPlace };
+      const pricePesos = event ? generalPriceCents(event) / 100 : undefined;
+
+      for (const t of genTickets as any[]) {
+        await ensureTicketPdf({
+          ticketId: t.ticketId,
+          order: orderForPdf,
+          seat: {
+            zoneId: "GENERAL",
+            tableLabel: "-",
+            seatLabel: undefined,
+            tableId: "GENERAL",
+            seatId: t.seatId,
+            price: pricePesos,
+          },
+        });
+      }
+
+      const origin = process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`;
+      const base = `${origin}/files/tickets`;
+      const files = (genTickets as any[]).map((t) => ({
+        ticketId: t.ticketId,
+        fileName: ticketFileName(t.ticketId),
+        url: `${base}/${ticketFileName(t.ticketId)}`,
+      }));
+
+      const ticketIds = (genTickets as any[]).map((t) => t.ticketId);
+      await ensureMergedTicketsPdf(String(order._id), ticketIds);
+      const merged = {
+        fileName: mergedTicketFileName(String(order._id)),
+        url: `${base}/${mergedTicketFileName(String(order._id))}`,
+      };
+
+      return res.json({ orderId, count: files.length, files, merged });
+    }
+
     const seats = await SeatHold.find({
   orderId,
   status: { $in: ["sold", "active"] }, // card -> active, cash -> sold

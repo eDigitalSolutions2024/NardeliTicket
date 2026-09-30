@@ -5,6 +5,9 @@ type OrderItem = {
   tableId: string;
   seatIds: string[];
   unitPrice: number;
+  // 🔹 Admisión general: cantidad de boletos (cuando no hay asientos)
+  quantity?: number;
+  ticketType?: string;
 };
 
 type OrderTotalsCents = {
@@ -57,6 +60,7 @@ export interface IOrder extends Document {
   totalsCents: OrderTotalsCents;
   userId: string;
   eventId: string;
+  admissionType?: "seated" | "general";
   sessionDate?: Date;
   items: OrderItem[];
 
@@ -128,6 +132,9 @@ const ItemSchema = new Schema<OrderItem>(
     tableId: String,
     seatIds: [String],
     unitPrice: Number,
+    // 🔹 Admisión general
+    quantity: Number,
+    ticketType: String,
   },
   { _id: false }
 );
@@ -157,6 +164,7 @@ const OrderSchema = new Schema<IOrder>(
     currency: { type: String, default: "MXN" },
     userId:   { type: String, required: true }, // del token
     eventId:  { type: String, required: true },
+    admissionType: { type: String, enum: ["seated", "general"], default: "seated" },
 
     totalsCents: { type: TotalsCentsSchema, default: () => ({}) },
     sessionDate: Date,

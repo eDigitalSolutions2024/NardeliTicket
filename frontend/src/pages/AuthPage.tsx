@@ -5,6 +5,7 @@ import Login from "./Login";
 import Register from "./Register";
 import "../CSS/Auth.css";
 import { useAuth } from "../auth/AuthProviders";
+import logoMaroon from "../assets/nardeli-mark-maroon.png";
 
 type Tab = "login" | "register";
 
@@ -49,12 +50,7 @@ export default function AuthPage() {
   return (
     <div className="auth">
       <div className="auth__card">
-        <div className="auth__panel" role="tabpanel">
-          {tab === "login"
-            ? <Login onSuccess={handleAuthSuccess} />
-            : <Register onSuccess={handleAuthSuccess} />
-          }
-        </div>
+        <img className="auth__logo" src={logoMaroon} alt="Nardeli" />
 
         <div className="auth__tabs" role="tablist" aria-label="Autenticación">
           <button
@@ -73,6 +69,13 @@ export default function AuthPage() {
           >
             Registrarse
           </button>
+        </div>
+
+        <div className="auth__panel" role="tabpanel">
+          {tab === "login"
+            ? <Login onSuccess={handleAuthSuccess} />
+            : <Register onSuccess={handleAuthSuccess} />
+          }
         </div>
       </div>
     </div>

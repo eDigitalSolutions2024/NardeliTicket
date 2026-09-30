@@ -50,10 +50,17 @@ export default function EventCard({
       <div className="card__body">
         <h3 className="card__title">{ev.title}</h3>
         <p className="card__meta">
-          {ev.venue} — {ev.city}
+          <span aria-hidden>📍</span> {ev.city}
         </p>
         <p className="card__price">
-          {next ? `Próx.: ${next.toLocaleString("es-MX")}` : "Sin fechas próximas"}
+          {next
+            ? next.toLocaleString("es-MX", {
+                day: "2-digit",
+                month: "long",
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            : "Sin fechas próximas"}
         </p>
       </div>
     </article>

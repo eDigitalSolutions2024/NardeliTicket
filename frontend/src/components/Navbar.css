@@ -1,295 +1,298 @@
+/* ============================================================
+   NardeliTicket · Navbar (glass premium)
+   ============================================================ */
 .nv {
   position: sticky;
   top: 0;
-  z-index: 50;
-  background: #0f172a;
-  color: #fff;
-  overflow-x: clip;
+  z-index: 100;
   width: 100%;
+  background: rgba(7, 20, 34, 0.78);
+  backdrop-filter: saturate(180%) blur(18px);
+  -webkit-backdrop-filter: saturate(180%) blur(18px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .nv__inner {
-  max-width: 1200px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0.75rem 1rem;
+  padding: 12px 24px;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  min-width: 0;
+  gap: 18px;
 }
 
-/* LEFT -------------------------------------------------------- */
 .nv__left {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  flex: 1;
-   min-width: 0;
+  gap: 22px;
+  min-width: 0;
+}
+
+.nv__burger {
+  display: none;
+  background: transparent;
+  border: 0;
+  font-size: 22px;
+  color: var(--color-text);
+  padding: 4px 8px;
+  border-radius: 8px;
 }
 
 .nv__brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  font-weight: 700;
-  color: #fff;
-  text-decoration: none;
-  letter-spacing: 0.3px;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.28rem;
+  letter-spacing: -0.02em;
+  color: #eef7fd;
+  white-space: nowrap;
 }
-
+.nv__brand:hover { color: #fff; }
 .nv__logo {
-  font-size: 1.25rem;
-}
-
-.nv__burger {
-  display: none;
-  border: 1px solid #334155;
-  background: transparent;
-  color: #fff;
-  border-radius: 0.5rem;
-  padding: 0.35rem 0.5rem;
-  cursor: pointer;
+  height: 30px;
+  width: auto;
+  display: block;
+  filter: drop-shadow(0 3px 10px rgba(147, 51, 234, 0.45));
 }
 
 .nv__links {
   display: flex;
-  gap: 1rem;
-  margin-left: 0.5rem;
+  align-items: center;
+  gap: 6px;
 }
-
 .nv__links a {
-  color: #cbd5e1;
-  text-decoration: none;
-  font-weight: 500;
+  position: relative;
+  color: rgba(220, 235, 246, 0.72);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 8px 12px;
+  border-radius: 10px;
+  transition: color var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
 }
-
 .nv__links a:hover {
   color: #fff;
+  background: rgba(255, 255, 255, 0.08);
 }
+.nv__links a::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--grad-brand);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--dur-2) var(--ease);
+}
+.nv__links a:hover::after { transform: scaleX(1); }
 
-/* SEARCH ------------------------------------------------------ */
+/* Search */
 .nv__search {
+  flex: 1;
+  max-width: 460px;
+  margin: 0 auto;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex: 1.2;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 4px 4px 4px 16px;
+  transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
 }
-
+.nv__search:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.18);
+}
 .nv__search input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  border: 1px solid #334155;
-  background: #0b1220;
-  color: #e2e8f0;
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 0.92rem;
+  color: #eef7fd;
+  min-width: 0;
 }
-
+.nv__search input::placeholder { color: rgba(220, 235, 246, 0.5); }
 .nv__search button {
-  padding: 0.5rem 0.85rem;
-  border-radius: 0.5rem;
-  border: 1px solid #334155;
-  background: #1e293b;
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-weight: 700;
+  font-size: 0.88rem;
   color: #fff;
-  cursor: pointer;
+  background: var(--grad-brand);
+  white-space: nowrap;
+  transition: transform var(--dur-1) var(--ease), filter var(--dur-2) var(--ease);
 }
+.nv__search button:hover { filter: brightness(1.07); transform: translateY(-1px); }
 
-.nv__search button:hover {
-  background: #334155;
-}
-
-/* RIGHT ------------------------------------------------------- */
+/* Right cluster */
 .nv__right {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 12px;
 }
 
 .nv__cart {
   position: relative;
-  color: #fff;
-  text-decoration: none;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: transform var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
 }
-
+.nv__cart:hover { transform: translateY(-2px); border-color: var(--color-primary); }
 .nv__badge {
   position: absolute;
-  top: -8px;
-  right: -10px;
-  background: #ef4444;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
   color: #fff;
+  background: var(--grad-brand);
   border-radius: 999px;
-  padding: 0 6px;
-  font-size: 0.7rem;
-  line-height: 18px;
-  min-width: 18px;
-  text-align: center;
+  border: 2px solid #0a1c2e;
 }
 
+/* Guest login */
 .nv__login {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.9rem;
   color: #fff;
-  text-decoration: none;
-  border: 1px solid #334155;
-  padding: 0.4rem 0.7rem;
-  border-radius: 0.5rem;
+  background: var(--grad-brand);
+  box-shadow: var(--shadow-brand);
+  transition: transform var(--dur-2) var(--ease), filter var(--dur-2) var(--ease);
 }
+.nv__login:hover { color: #fff; transform: translateY(-2px); filter: brightness(1.06); }
+.nv__login-icon { display: none; }
 
-.nv__login:hover {
-  background: #1f2937;
-}
-
-/* user logged in ---------------------------------------------- */
-.nv__user {
-  position: relative;
-}
-
+/* User menu */
+.nv__user { position: relative; }
 .nv__userbtn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: transparent;
-  border: 0;
-  color: #fff;
-  cursor: pointer;
-}
-
-.nv__avatar {
-  width: 28px;
-  height: 28px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 999px;
-  background: #0a5cff;
+  padding: 5px 12px 5px 5px;
+  transition: border-color var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+.nv__userbtn:hover { border-color: var(--color-primary); }
+.nv__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
   display: grid;
   place-items: center;
   font-weight: 800;
   font-size: 0.8rem;
+  color: #fff;
+  background: var(--grad-brand);
 }
-
 .nv__username {
-  max-width: 180px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #eef7fd;
+  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.nv__chev {
-  opacity: 0.8;
-}
+.nv__chev { color: rgba(220, 235, 246, 0.6); font-size: 0.7rem; }
 
 .nv__menu {
   position: absolute;
   right: 0;
-  top: 110%;
-  background: #fff;
-  color: #0f172a;
-  min-width: 200px;
-  border-radius: 10px;
-  box-shadow: 0 10px 30px rgba(2, 8, 23, 0.18);
+  top: calc(100% + 10px);
+  min-width: 210px;
+  background: #0d2033;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  box-shadow: var(--shadow-3);
   padding: 6px;
   display: grid;
-  gap: 4px;
-  z-index: 20;
+  gap: 2px;
+  animation: nvMenuIn var(--dur-2) var(--ease);
 }
-
+@keyframes nvMenuIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 .nv__menu a,
 .nv__menu button {
   text-align: left;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 0;
   background: transparent;
-  color: inherit;
-  cursor: pointer;
+  border: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(220, 235, 246, 0.85);
+  transition: background var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
 }
-
 .nv__menu a:hover,
 .nv__menu button:hover {
-  background: #f1f5f9;
+  background: rgba(255, 255, 255, 0.08);
+  color: #c4b5fd;
 }
 
-/* guest wrapper (texto + icono) ------------------------------- */
-.nv__guest {
-  display: flex;
-  align-items: center;
-}
-
-/* icono de login para móvil (oculto en desktop) */
-.nv__login-icon {
-  display: none;
-  margin-left: 0.25rem;
-  text-decoration: none;
-  color: inherit;
-}
-
-.nv__left,
-.nv__search,
-.nv__right {
-  min-width: 0;
-}
-
-.nv__search input {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.nv__search button {
-  flex: 0 0 auto;
-  white-space: nowrap;
-}
-
-
-/* Mobile ------------------------------------------------------ */
+/* ============================================================
+   Responsive
+   ============================================================ */
 @media (max-width: 900px) {
-  .nv__inner {
-    flex-wrap: wrap;
-    row-gap: 0.5rem;
-  }
+  .nv__search { max-width: 260px; }
+  .nv__username { display: none; }
+}
 
-  .nv__left {
-    flex: 1 1 auto; min-width: 0;
-  }
-
-  .nv__burger {
-    display: inline-flex;
-  }
+@media (max-width: 720px) {
+  .nv__inner { padding: 10px 16px; gap: 12px; }
+  .nv__burger { display: inline-flex; }
+  .nv__search { display: none; }
 
   .nv__links {
-    display: none;
     position: absolute;
-    top: 56px;
+    top: 100%;
     left: 0;
     right: 0;
-    background: #0f172a;
-    padding: 0.75rem 1rem;
-    border-top: 1px solid #1f2940;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 2px;
+    background: rgba(7, 20, 34, 0.98);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px 16px 16px;
+    box-shadow: var(--shadow-3);
+    transform: translateY(-8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
   }
-
   .nv__links.is-open {
-    display: grid;
-    gap: 0.5rem;
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
   }
+  .nv__links a { padding: 12px; }
+  .nv__links a::after { display: none; }
 
-  /* buscador pasa a segunda fila y ocupa todo */
-  .nv__search {
-    order: 10;
-    flex: 1 0 100%;
-  }
-
-  /* lado derecho más compacto */
-  .nv__right {
-   min-width: 0;
-  }
-
-  /* usuario: solo avatar (icono), sin nombre ni flecha */
-  .nv__username,
-  .nv__chev {
-    display: none;
-  }
-
-  /* login: en móvil mostramos solo el iconito */
-  .nv__login {
-    display: none;
-  }
-
-  .nv__login-icon {
-    display: inline-flex;
-  }
+  .nv__login { display: none; }
+  .nv__login-icon { display: inline-flex; }
 }

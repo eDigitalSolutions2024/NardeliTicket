@@ -60,6 +60,15 @@ const mapToEventItem = (d: any): EventItem => ({
   },
   disabledTables: Array.isArray(d.disabledTables) ? d.disabledTables : [], // 👈 NUEVO
   disabledSeats : Array.isArray(d.disabledSeats) ? d.disabledSeats : [],
+  admissionType: d.admissionType === "general" ? "general" : "seated",
+  generalAdmission: {
+    price: d.generalAdmission?.price ?? 0,
+    priceCents: d.generalAdmission?.priceCents ?? 0,
+    capacity:
+      d.generalAdmission?.capacity === null || d.generalAdmission?.capacity === undefined
+        ? null
+        : Number(d.generalAdmission.capacity),
+  },
 });
 
 
@@ -91,7 +100,18 @@ function toCreateBody(p: Partial<EventItem>) {
     body.disabledSeats = p.disabledSeats;
   }
 
-  
+  // 👇 Admisión general
+  body.admissionType = p.admissionType ?? "seated";
+  if (p.generalAdmission) {
+    body.generalAdmission = {
+      price: p.generalAdmission.price ?? 0,
+      capacity:
+        p.generalAdmission.capacity === null || p.generalAdmission.capacity === undefined
+          ? null
+          : Number(p.generalAdmission.capacity),
+    };
+  }
+
   return body;
 }
 
@@ -127,7 +147,19 @@ function toUpdateBody(p: Partial<EventItem>) {
     body.disabledSeats = p.disabledSeats;
   }
 
-
+  // 👇 Admisión general
+  if (p.admissionType !== undefined) {
+    body.admissionType = p.admissionType;
+  }
+  if (p.generalAdmission !== undefined) {
+    body.generalAdmission = {
+      price: p.generalAdmission.price ?? 0,
+      capacity:
+        p.generalAdmission.capacity === null || p.generalAdmission.capacity === undefined
+          ? null
+          : Number(p.generalAdmission.capacity),
+    };
+  }
 
   return body;
 }

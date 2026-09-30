@@ -1,6 +1,103 @@
-.auth { min-height: calc(100dvh - 64px); display: grid; place-items: center; padding: 24px; }
-.auth__card { width: 100%; max-width: 460px; background: #fff; border-radius: 14px; box-shadow: 0 10px 30px rgba(2,8,23,.08); padding: 16px; max-height:600px; }
-.auth__tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #f1f5f9; padding: 6px; border-radius: 10px; margin-bottom: 16px; }
-.auth__tab { height: 40px; border: 0; border-radius: 8px; background: transparent; font-weight: 700; cursor: pointer; }
-.auth__tab.is-active { background: #7777778f; color: #fff; }
-.auth__panel { padding-top: 0px; margin-top: -80px;}
+/* ============================================================
+   NardeliTicket · Auth (login / registro) premium
+   ============================================================ */
+.auth {
+  min-height: calc(100dvh - 68px);
+  display: grid;
+  place-items: center;
+  padding: 40px 20px;
+  position: relative;
+  isolation: isolate;
+}
+.auth::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(600px 340px at 15% 10%, rgba(139, 92, 246, 0.14), transparent 60%),
+    radial-gradient(600px 340px at 85% 90%, rgba(124, 58, 237, 0.12), transparent 60%);
+}
+
+.auth__card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-3);
+  padding: 28px;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.auth__logo {
+  width: 78px;
+  height: auto;
+  margin: 0 auto 6px;
+  display: block;
+  filter: drop-shadow(0 6px 16px rgba(147, 51, 234, 0.28));
+}
+
+.auth__tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  background: rgba(139, 92, 246, 0.07);
+  padding: 6px;
+  border-radius: 999px;
+  margin-bottom: 4px;
+}
+.auth__tab {
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+}
+.auth__tab:hover { color: var(--color-text); }
+.auth__tab.is-active {
+  background: var(--grad-brand);
+  color: #fff;
+  box-shadow: var(--shadow-brand);
+}
+
+/* Reset del hack anterior */
+.auth__panel {
+  padding-top: 0;
+  margin-top: 0;
+}
+
+/* El formulario interno (Login/Register usan .container) */
+.auth__panel .container {
+  max-width: 100% !important;
+  width: 100%;
+  padding: 0 !important;
+  margin: 0;
+  text-align: left;
+}
+.auth__panel h1 {
+  font-size: 1.6rem;
+  margin: 4px 0 18px;
+  text-align: center;
+}
+.auth__panel form { margin-bottom: 8px; }
+.auth__panel p {
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  margin: 14px 0 0;
+}
+
+/* Botón ancho */
+.btn-block { width: 100%; }
+.auth__panel .btn.btn-primary {
+  width: 100%;
+  height: 48px;
+  margin-top: 6px;
+}

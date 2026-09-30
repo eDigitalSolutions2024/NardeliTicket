@@ -1,22 +1,227 @@
-.u-container { margin: 0 auto; padding: 16px; max-width: 1200px; }
-
-.btn-primary {
-  border: 0;
-  background: #0a5cff;
-  color: #fff;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-weight: 700;
-  cursor: pointer;
+/* ============================================================
+   NardeliTicket · Detalle de evento (oscuro / morado)
+   ============================================================ */
+.ed {
+  position: relative;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 32px 24px 80px;
+  color: var(--color-on-dark);
+  animation: edIn 0.5s var(--ease) both;
 }
-.btn-primary:disabled { opacity: .6; cursor: not-allowed; }
+@keyframes edIn { from { opacity: 0; } to { opacity: 1; } }
 
-.btn-secondary {
-  border: 0;
-  background: #64748b;
+.ed-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1100px 620px at 50% -8%, #1e1140 0%, transparent 58%),
+    radial-gradient(900px 560px at 12% 88%, #170c30 0%, transparent 55%),
+    linear-gradient(180deg, #0b0718 0%, #0f0a24 55%, #080512 100%);
+}
+
+.ed-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 28px;
+  align-items: start;
+}
+
+/* ---- Media (imagen completa con fondo difuminado) ---- */
+.ed-media {
+  position: relative;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  height: clamp(340px, 52vh, 520px);
+  background: #0b0718;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-3);
+}
+.ed-media__blur {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.2);
+  filter: blur(28px) brightness(0.5) saturate(1.15);
+}
+.ed-media__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 14px;
+  z-index: 1;
+}
+.ed-cat {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 2;
+  display: inline-flex;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: #fff;
+  background: var(--grad-brand);
+  padding: 6px 12px;
+  border-radius: 999px;
+  box-shadow: var(--shadow-brand);
+}
+
+/* ---- Panel derecho (glass) ---- */
+.ed-panel {
+  position: sticky;
+  top: 88px;
+  background: rgba(23, 16, 43, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: var(--shadow-2);
+}
+.ed-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3vw, 2.3rem);
+  line-height: 1.05;
+  margin: 0 0 8px;
+  color: #fff;
+}
+.ed-venue {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--color-on-dark-muted);
+  font-size: 0.92rem;
+  margin: 0 0 18px;
+}
+
+.ed-section-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c4b5fd;
+  margin: 18px 0 10px;
+}
+
+/* Fechas (radio cards) */
+.ed-sessions { display: grid; gap: 8px; }
+.ed-session {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 12px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
+  color: var(--color-on-dark);
+  font-size: 0.92rem;
+}
+.ed-session:hover { border-color: var(--color-primary); transform: translateY(-1px); }
+.ed-session.is-active {
+  border-color: transparent;
+  background: rgba(139, 92, 246, 0.18);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+.ed-session input { accent-color: var(--color-primary); width: 16px; height: 16px; }
+
+/* Caja de compra */
+.ed-buybox {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.ed-row { display: flex; align-items: center; justify-content: space-between; }
+.ed-row + .ed-row { margin-top: 12px; }
+.ed-price { font-size: 1.15rem; font-weight: 800; color: #fff; }
+.ed-buy-label { font-weight: 600; color: var(--color-on-dark); }
+.ed-sub-label { color: var(--color-on-dark-muted); }
+.ed-sub-value { font-size: 1.2rem; font-weight: 800; color: #c4b5fd; }
+.ed-cap-note { margin: 10px 0 0; font-size: 0.78rem; color: var(--color-on-dark-muted); }
+
+/* Stepper cantidad */
+.ed-qty { display: inline-flex; align-items: center; gap: 8px; }
+.ed-qty button {
+  width: 36px; height: 36px;
   border-radius: 10px;
-  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
+}
+.ed-qty button:hover { border-color: var(--color-primary); background: rgba(139, 92, 246, 0.2); }
+.ed-qty input {
+  width: 60px; height: 36px;
+  text-align: center;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Acciones */
+.ed-actions { margin-top: 20px; display: flex; gap: 10px; }
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  background: var(--grad-brand);
+  color: #fff;
+  border-radius: 999px;
+  padding: 13px 24px;
+  font-weight: 700;
+  font-size: 0.98rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-brand);
+  transition: transform var(--dur-2) var(--ease), filter var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
+  flex: 1;
+}
+.btn-primary:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.08); box-shadow: var(--shadow-glow); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border-radius: 999px;
+  padding: 13px 20px;
   font-weight: 700;
   cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
+}
+.btn-secondary:hover { border-color: var(--color-primary); background: rgba(139, 92, 246, 0.18); }
+
+.ed-empty { color: var(--color-on-dark-muted); }
+
+/* Estados de carga / centrados */
+.ed-status {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 80px 24px;
+  color: var(--color-on-dark);
+}
+
+@media (max-width: 860px) {
+  .ed-grid { grid-template-columns: 1fr; }
+  .ed-panel { position: static; }
+  .ed-media { height: clamp(300px, 60vw, 460px); }
 }

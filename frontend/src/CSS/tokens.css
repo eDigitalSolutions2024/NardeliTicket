@@ -1,54 +1,71 @@
 :root {
-/* Colors */
---color-bg: #ffffff;
---color-text: #0f172a; /* slate-900 */
---color-text-muted: #475569; /* slate-600 */
---color-primary: #0ea5e9; /* sky-500 */
---color-primary-600: #0284c7; /* sky-600 */
---color-surface: #ffffff;
---color-border: rgba(15, 23, 42, 0.08);
---color-overlay: rgba(2, 6, 23, 0.65);
---color-danger: #ef4444; /* red-500 */
---color-success: #16a34a; /* green-600 */
+  /* ===== Colors (marca Nardeli: morado) ===== */
+  --color-bg: #f7f5fc;             /* off-white con tinte violeta */
+  --color-text: #1a1229;           /* casi negro violáceo */
+  --color-text-muted: #5b5470;     /* gris violáceo */
+  --color-surface: #ffffff;
+  --color-surface-2: #f7f4fd;
 
+  --color-primary: #8b5cf6;        /* violet-400/500 */
+  --color-primary-600: #7c3aed;    /* violet-600 */
+  --color-accent: #9333ea;         /* purple-600 */
+  --color-accent-2: #c084fc;       /* purple-400 */
+  --color-cyan: #a855f7;
 
-/* Typography */
---font-sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
---fs-xs: 0.75rem; /* 12 */
---fs-sm: 0.875rem; /* 14 */
---fs-base: 1rem; /* 16 */
---fs-lg: 1.125rem; /* 18 */
---fs-xl: 1.25rem; /* 20 */
---fs-2xl: clamp(1.5rem, 2.4vw, 2rem);
---fs-3xl: clamp(1.75rem, 3.2vw, 2.5rem);
+  --color-border: rgba(26, 18, 41, 0.08);
+  --color-border-strong: rgba(26, 18, 41, 0.16);
+  --color-overlay: rgba(12, 8, 24, 0.66);
+  --color-danger: #ef4444;
+  --color-success: #16a34a;
 
+  /* Sobre fondos oscuros (hero) */
+  --color-dark: #0d0a1f;
+  --color-dark-2: #17102b;
+  --color-on-dark: #f3effd;
+  --color-on-dark-muted: #b9afd6;
 
-/* Spacing */
---sp-4: 4px;
---sp-8: 8px;
---sp-12: 12px;
---sp-16: 16px;
---sp-24: 24px;
---sp-32: 32px;
---sp-48: 48px;
+  /* ===== Gradients ===== */
+  --grad-brand: linear-gradient(120deg, #6d28d9 0%, #9333ea 55%, #a855f7 115%);
+  --grad-brand-soft: linear-gradient(120deg, rgba(139, 92, 246, 0.16), rgba(147, 51, 234, 0.14));
+  --grad-text: linear-gradient(120deg, #c4b5fd, #a855f7 55%, #d8b4fe);
 
+  /* ===== Typography ===== */
+  --font-display: "Sora", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.875rem;
+  --fs-base: 1rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.25rem;
+  --fs-2xl: clamp(1.5rem, 2.4vw, 2rem);
+  --fs-3xl: clamp(1.9rem, 3.4vw, 2.75rem);
+  --fs-4xl: clamp(2.4rem, 6vw, 4.5rem);
 
-/* Radius & shadow */
---radius-sm: 8px;
---radius-md: 12px;
---radius-lg: 16px;
---shadow-1: 0 1px 2px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.08);
---shadow-2: 0 8px 24px rgba(0,0,0,0.12);
+  /* ===== Spacing ===== */
+  --sp-4: 4px;  --sp-8: 8px;  --sp-12: 12px; --sp-16: 16px;
+  --sp-24: 24px; --sp-32: 32px; --sp-48: 48px; --sp-64: 64px;
 
+  /* ===== Radius & shadow ===== */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --shadow-1: 0 1px 2px rgba(22, 19, 31, 0.06), 0 2px 8px rgba(22, 19, 31, 0.06);
+  --shadow-2: 0 10px 30px rgba(22, 19, 31, 0.12);
+  --shadow-3: 0 24px 60px rgba(22, 19, 31, 0.18);
+  --shadow-brand: 0 10px 30px rgba(124, 58, 237, 0.4);
+  --shadow-glow: 0 0 0 1px rgba(139, 92, 246, 0.28), 0 12px 40px rgba(147, 51, 234, 0.35);
 
-/* Motion */
---ease: cubic-bezier(0.2, 0.6, 0.2, 1);
---dur-1: 120ms;
---dur-2: 200ms;
+  /* ===== Motion ===== */
+  --ease: cubic-bezier(0.22, 0.61, 0.28, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur-1: 140ms;
+  --dur-2: 240ms;
+  --dur-3: 420ms;
 }
 
-
 @media (prefers-reduced-motion: reduce) {
-:root { --dur-1: 0ms; --dur-2: 0ms; }
-* { animation-duration: 0ms !important; transition-duration: 0ms !important; }
+  :root { --dur-1: 0ms; --dur-2: 0ms; --dur-3: 0ms; }
+  * { animation-duration: 0ms !important; transition-duration: 0ms !important; }
+  html { scroll-behavior: auto; }
 }

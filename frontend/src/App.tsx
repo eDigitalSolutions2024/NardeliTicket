@@ -1,5 +1,6 @@
 // App.tsx
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import EventsPage from "./pages/Events";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -24,13 +25,19 @@ function RequireAuth({ children }: { children: JSX.Element }) {
   return children;
 }
 
-export default function App() {
+function AppShell() {
+  const location = useLocation();
+  const hideNav = location.pathname === "/"; // la pantalla inicial va sin navbar
+
   return (
-    <Router>
-      <Navbar />
+    <>
+      {!hideNav && <Navbar />}
       <Routes>
+        {/* Pantalla inicial (splash) */}
+        <Route path="/" element={<Landing />} />
+
         {/* Públicas */}
-        <Route path="/" element={<Home />} />
+        <Route path="/home" element={<Home />} />
         <Route path="/events" element={<EventsPage />} />
         <Route path="/events/:id" element={<EventDetail />} />
 
@@ -79,8 +86,16 @@ export default function App() {
         />
 
         {/* Catch-all */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <Router>
+      <AppShell />
     </Router>
   );
 }

@@ -13,17 +13,36 @@ async function issueTicketsForOrder(orderId: string) {
   if (order.tickets && order.tickets.length) return;
 
   const tickets: any[] = [];
+  let genIndex = 0;
   for (const it of order.items || []) {
-    const { zoneId, tableId, seatIds = [] } = it as any;
-    for (const seatId of seatIds) {
-      tickets.push({
-        ticketId: `${orderId}-${seatId}-${nanoid(6)}`,
-        seatId,
-        tableId,
-        zoneId,
-        status: "issued",
-        issuedAt: new Date(),
-      });
+    const { zoneId, tableId, seatIds = [], quantity } = it as any;
+
+    if (Array.isArray(seatIds) && seatIds.length) {
+      // Evento con asientos (seated)
+      for (const seatId of seatIds) {
+        tickets.push({
+          ticketId: `${orderId}-${seatId}-${nanoid(6)}`,
+          seatId,
+          tableId,
+          zoneId,
+          status: "issued",
+          issuedAt: new Date(),
+        });
+      }
+    } else {
+      // Admisión general: emitir N boletos genéricos por cantidad
+      const qty = Number.isFinite(Number(quantity)) ? Math.floor(Number(quantity)) : 0;
+      for (let i = 0; i < qty; i++) {
+        genIndex++;
+        tickets.push({
+          ticketId: `${orderId}-GEN-${genIndex}-${nanoid(6)}`,
+          seatId: `GEN-${genIndex}`,
+          tableId: tableId || "GENERAL",
+          zoneId: zoneId || "GENERAL",
+          status: "issued",
+          issuedAt: new Date(),
+        });
+      }
     }
   }
 

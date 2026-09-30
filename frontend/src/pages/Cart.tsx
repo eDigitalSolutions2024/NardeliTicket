@@ -4,11 +4,19 @@ import { useLocation, useNavigate, Link } from "react-router-dom";
 import { api } from "../api/client";
 
 type CartItem = {
-  zoneId: string;      // "VIP" | "ORO"
-  tableId: string;     // p.ej. "ORO-04"
-  seatIds: string[];   // ["S183", ...]
-  unitPrice: number;   // precio por asiento para esa mesa/zona
+  zoneId: string;      // "VIP" | "ORO" | "GENERAL"
+  tableId: string;     // p.ej. "ORO-04" | "GENERAL"
+  seatIds: string[];   // ["S183", ...] (vacío en admisión general)
+  unitPrice: number;   // precio por asiento/boleto
+  quantity?: number;   // admisión general: cantidad de boletos
+  ticketType?: string; // admisión general
 };
+
+// Cantidad de boletos de un item: por asientos (seated) o por cantidad (general)
+function itemQty(it: CartItem): number {
+  if (Array.isArray(it.seatIds) && it.seatIds.length) return it.seatIds.length;
+  return Number.isFinite(Number(it.quantity)) ? Number(it.quantity) : 0;
+}
 
 type CartTotals = {
   subtotal: number;
@@ -81,8 +89,8 @@ export default function CartPage() {
 
   // 2) Recalcular totales cuando cambian los items
   const totals = useMemo<CartTotals>(() => {
-    const seatCount = items.reduce((acc, it) => acc + it.seatIds.length, 0);
-    const subtotal = items.reduce((acc, it) => acc + it.seatIds.length * it.unitPrice, 0);
+    const seatCount = items.reduce((acc, it) => acc + itemQty(it), 0);
+    const subtotal = items.reduce((acc, it) => acc + itemQty(it) * it.unitPrice, 0);
     const fees = feePct > 0 ? (subtotal * feePct) / 100 : 0;
     return { seatCount, subtotal, fees, total: subtotal + fees };
   }, [items, feePct]);
@@ -125,6 +133,15 @@ export default function CartPage() {
 
   function removeTable(tableId: string) {
     setItems((prev) => prev.filter((it) => it.tableId !== tableId));
+  }
+
+  // Admisión general: cambiar cantidad de boletos de un item
+  function updateQty(idx: number, nextQty: number) {
+    setItems((prev) =>
+      prev
+        .map((it, i) => (i === idx ? { ...it, quantity: Math.max(0, nextQty) } : it))
+        .filter((it) => itemQty(it) > 0)
+    );
   }
 
   function clearAll() {
@@ -233,8 +250,10 @@ async function handleCheckout(
       return;
     }
     if (err?.response?.status === 409) {
-      alert("Algunos asientos ya no están disponibles. Vuelve a seleccionar.");
-      navigate(`/event/${eventId}/seleccion`);
+      const msg =
+        err?.response?.data?.message ||
+        "Algunos boletos ya no están disponibles. Vuelve a intentar.";
+      alert(msg);
       return;
     }
     console.error(err);
@@ -317,73 +336,119 @@ async function handleCheckout(
               marginBottom: 16,
             }}
           >
-            {items.map((it) => (
-              <div
-                key={it.tableId}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  gap: 8,
-                  padding: 14,
-                  borderBottom: "1px solid #f3f4f6",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700 }}>
-                    {it.tableId} <span style={{ color: "#6b7280" }}>({it.zoneId})</span>
-                  </div>
-                  <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {it.seatIds.map((sid) => (
-                      <span
-                        key={sid}
-                        title="Quitar asiento"
-                        onClick={() => removeSeat(it.tableId, sid)}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          padding: "4px 8px",
-                          borderRadius: 999,
-                          border: "1px solid #e5e7eb",
-                          background: "#f9fafb",
-                          cursor: "pointer",
-                          userSelect: "none",
-                          fontSize: 13,
-                        }}
-                      >
-                        {sid}
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                          <path d="M18 6L6 18M6 6l12 12" stroke="#9ca3af" strokeWidth="2" />
-                        </svg>
-                      </span>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => removeTable(it.tableId)}
-                    style={{
-                      marginTop: 10,
-                      padding: "4px 10px",
-                      borderRadius: 8,
-                      border: "1px solid #fecaca",
-                      background: "#fff1f2",
-                      color: "#b91c1c",
-                      fontSize: 12,
-                    }}
-                  >
-                    Quitar mesa completa
-                  </button>
-                </div>
+            {items.map((it, idx) => {
+              const isGeneral = !(Array.isArray(it.seatIds) && it.seatIds.length);
+              const qty = itemQty(it);
 
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontWeight: 700 }}>
-                    {money(it.unitPrice * it.seatIds.length, currency)}
+              return (
+                <div
+                  key={it.tableId + ":" + idx}
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto",
+                    gap: 8,
+                    padding: 14,
+                    borderBottom: "1px solid #f3f4f6",
+                  }}
+                >
+                  <div>
+                    {isGeneral ? (
+                      <>
+                        <div style={{ fontWeight: 700 }}>
+                          Boleto general{" "}
+                          <span style={{ color: "#6b7280" }}>(admisión general)</span>
+                        </div>
+                        <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 13, color: "#6b7280" }}>Cantidad:</span>
+                          <button
+                            onClick={() => updateQty(idx, qty - 1)}
+                            style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #d1d5db", fontSize: 16 }}
+                          >
+                            −
+                          </button>
+                          <span style={{ minWidth: 28, textAlign: "center", fontWeight: 700 }}>{qty}</span>
+                          <button
+                            onClick={() => updateQty(idx, qty + 1)}
+                            style={{ width: 30, height: 30, borderRadius: 8, border: "1px solid #d1d5db", fontSize: 16 }}
+                          >
+                            +
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => removeTable(it.tableId)}
+                          style={{
+                            marginTop: 10,
+                            padding: "4px 10px",
+                            borderRadius: 8,
+                            border: "1px solid #fecaca",
+                            background: "#fff1f2",
+                            color: "#b91c1c",
+                            fontSize: 12,
+                          }}
+                        >
+                          Quitar
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 700 }}>
+                          {it.tableId} <span style={{ color: "#6b7280" }}>({it.zoneId})</span>
+                        </div>
+                        <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {it.seatIds.map((sid) => (
+                            <span
+                              key={sid}
+                              title="Quitar asiento"
+                              onClick={() => removeSeat(it.tableId, sid)}
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: 6,
+                                padding: "4px 8px",
+                                borderRadius: 999,
+                                border: "1px solid #e5e7eb",
+                                background: "#f9fafb",
+                                cursor: "pointer",
+                                userSelect: "none",
+                                fontSize: 13,
+                              }}
+                            >
+                              {sid}
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                                <path d="M18 6L6 18M6 6l12 12" stroke="#9ca3af" strokeWidth="2" />
+                              </svg>
+                            </span>
+                          ))}
+                        </div>
+                        <button
+                          onClick={() => removeTable(it.tableId)}
+                          style={{
+                            marginTop: 10,
+                            padding: "4px 10px",
+                            borderRadius: 8,
+                            border: "1px solid #fecaca",
+                            background: "#fff1f2",
+                            color: "#b91c1c",
+                            fontSize: 12,
+                          }}
+                        >
+                          Quitar mesa completa
+                        </button>
+                      </>
+                    )}
                   </div>
-                  <div style={{ color: "#6b7280", fontSize: 12 }}>
-                    {money(it.unitPrice, currency)} c/u
+
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontWeight: 700 }}>
+                      {money(it.unitPrice * qty, currency)}
+                    </div>
+                    <div style={{ color: "#6b7280", fontSize: 12 }}>
+                      {money(it.unitPrice, currency)} c/u
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Totales */}

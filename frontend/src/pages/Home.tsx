@@ -3,6 +3,7 @@ import  { useEffect, useMemo, useState } from "react";
 import SimpleCarousel, { type Slide } from "../components/SimpleCarousel";
 import type { EventItem } from "../types/Event";
 import EventCard from "../components/EventCard";
+import WebGLParticles from "../components/WebGLParticles";
 import { fetchEvents } from "../api/events";
 import "../CSS/Home.css";
 
@@ -63,7 +64,7 @@ export default function Home() {
         image: e.imageUrl,
         title: e.title,
         subtitle: `${e.venue} — ${e.city}`,
-        ctaHref: `/evento/${e.id}`,
+        ctaHref: `/events/${e.id}`,
       }));
 
     const merged = [...featuredSlides];
@@ -96,13 +97,16 @@ export default function Home() {
 
   return (
     <main className="home u-container">
+      {/* Fondo azul oscuro a pantalla completa (como el splash) */}
+      <div className="page-backdrop" aria-hidden />
+      <WebGLParticles className="home__particles" ambient={0.5} />
 
       {/* HERO mejorado con overlay */}
     <div className="home__hero enhanced-hero">
       <div className="enhanced-hero__bg-blur" aria-hidden />
 
       {/* Carrusel */}
-      <SimpleCarousel slides={heroSlides} height={620} />
+      <SimpleCarousel slides={heroSlides} height={460} />
 
       {/* Stats flotando arriba */}
       <div className="enhanced-hero__stats top">
@@ -202,19 +206,15 @@ export default function Home() {
             {/* overlay superior izquierdo */}
             {badge.variant && <span className={`ec-badge ec-${badge.variant}`}>{badge.text}</span>}
 
-            {/* overlay inferior (fecha + ciudad) */}
+            {/* fecha corta sobre la imagen */}
             {next && (
-              <div className="ec-overlay-meta">
-                <span className="ec-chip">{new Date(next).toLocaleDateString()}</span>
-                <span className="ec-dot" />
-                <span className="ec-chip">{ev.city}</span>
-              </div>
+              <span className="ec-date">
+                {new Date(next).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
+              </span>
             )}
 
-            {/* tu card tal cual */}
-            <div className="card shell card--clickable">
-              <EventCard ev={ev} className="card" onClick={() => {}} />
-            </div>
+            {/* tarjeta premium */}
+            <EventCard ev={ev} onClick={() => {}} />
           </div>
         );
       })}
@@ -229,7 +229,7 @@ export default function Home() {
           <h3>¿Organizas un evento?</h3>
           <p>Vende tus boletos con NardeliTicket y recibe pagos al instante.</p>
           <div className="cta__actions">
-            <a href="/auth/register" className="btn btn-primary">Crear cuenta</a>
+            <a href="/auth?tab=register" className="btn btn-primary">Crear cuenta</a>
             <a href="/events" className="btn btn-ghost">Ver eventos</a>
           </div>
         </div>

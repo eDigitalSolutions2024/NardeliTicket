@@ -1,5 +1,5 @@
 // src/pages/CheckoutSuccess.tsx
-import React, { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { API_BASE, api } from "../api/client";
 import "../CSS/CheckoutSuccess.css";

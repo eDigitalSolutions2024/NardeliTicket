@@ -916,7 +916,7 @@ export async function generateOrderTicketsPdfs(req: Request, res: Response) {
         });
       }
 
-      const origin = process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`;
+      const origin = process.env.BACKEND_URL || process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`;
       const base = `${origin}/files/tickets`;
       const files = (genTickets as any[]).map((t) => ({
         ticketId: t.ticketId,
@@ -1033,9 +1033,9 @@ console.log("DEBUG seatForPdf ->", seatForPdf);
       });
     }
 
-    // URLs
+    // URLs — usar BACKEND_URL para que los PDFs apunten al servidor Express, no al frontend
     const origin =
-      process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`;
+      process.env.BACKEND_URL || process.env.PUBLIC_URL || `${req.protocol}://${req.get("host")}`;
     const base = `${origin}/files/tickets`;
 
     const files = tickets.map((t: any) => ({
@@ -1053,7 +1053,7 @@ console.log("DEBUG seatForPdf ->", seatForPdf);
       url: `${base}/${mergedTicketFileName(String(order._id))}`,
     };
 
-    return res.json({ orderId, count: files.length, files, merged });
+    return res.json({ orderId, count: files.length, files, merged, file: merged });
   } catch (e: any) {
     console.error("generateOrderTicketsPdfs error:", e);
     return res

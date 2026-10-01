@@ -17,9 +17,9 @@
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(1100px 620px at 50% -8%, #1e1140 0%, transparent 58%),
-    radial-gradient(900px 560px at 12% 88%, #170c30 0%, transparent 55%),
-    linear-gradient(180deg, #0b0718 0%, #0f0a24 55%, #080512 100%);
+    radial-gradient(1000px 520px at 50% -10%, rgba(124, 58, 237, 0.22), transparent 60%),
+    radial-gradient(820px 500px at 12% 100%, rgba(147, 51, 234, 0.15), transparent 55%),
+    linear-gradient(180deg, #171032 0%, #140d28 55%, #0d0820 100%);
 }
 
 .ed-grid {
@@ -79,7 +79,7 @@
 .ed-panel {
   position: sticky;
   top: 88px;
-  background: rgba(23, 16, 43, 0.55);
+  background: rgba(22, 20, 30, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-lg);
   padding: 24px;
@@ -108,7 +108,7 @@
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #c4b5fd;
+  color: #7dd3fc;
   margin: 18px 0 10px;
 }
 
@@ -130,7 +130,7 @@
 .ed-session:hover { border-color: var(--color-primary); transform: translateY(-1px); }
 .ed-session.is-active {
   border-color: transparent;
-  background: rgba(139, 92, 246, 0.18);
+  background: rgba(14, 165, 233, 0.18);
   box-shadow: 0 0 0 1px var(--color-primary);
 }
 .ed-session input { accent-color: var(--color-primary); width: 16px; height: 16px; }
@@ -148,7 +148,7 @@
 .ed-price { font-size: 1.15rem; font-weight: 800; color: #fff; }
 .ed-buy-label { font-weight: 600; color: var(--color-on-dark); }
 .ed-sub-label { color: var(--color-on-dark-muted); }
-.ed-sub-value { font-size: 1.2rem; font-weight: 800; color: #c4b5fd; }
+.ed-sub-value { font-size: 1.2rem; font-weight: 800; color: #7dd3fc; }
 .ed-cap-note { margin: 10px 0 0; font-size: 0.78rem; color: var(--color-on-dark-muted); }
 
 /* Stepper cantidad */
@@ -163,7 +163,7 @@
   cursor: pointer;
   transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
 }
-.ed-qty button:hover { border-color: var(--color-primary); background: rgba(139, 92, 246, 0.2); }
+.ed-qty button:hover { border-color: var(--color-primary); background: rgba(14, 165, 233, 0.2); }
 .ed-qty input {
   width: 60px; height: 36px;
   text-align: center;
@@ -208,7 +208,7 @@
   cursor: pointer;
   transition: border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease);
 }
-.btn-secondary:hover { border-color: var(--color-primary); background: rgba(139, 92, 246, 0.18); }
+.btn-secondary:hover { border-color: var(--color-primary); background: rgba(14, 165, 233, 0.18); }
 
 .ed-empty { color: var(--color-on-dark-muted); }
 
@@ -225,3 +225,9 @@
   .ed-panel { position: static; }
   .ed-media { height: clamp(300px, 60vw, 460px); }
 }
+
+/* Acentos blancos */
+.ed-cat { color: var(--on-brand); }
+.btn-primary { color: var(--on-brand); }
+.ed-section-title { color: rgba(255, 255, 255, 0.85); }
+.ed-sub-value { color: #ffffff; }

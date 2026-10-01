@@ -332,8 +332,10 @@ function addSessionFromInput() {
   }, [events, q]);
 
   return (
-    <div className="page-admin">
-      <h1 style={{ margin: "16px 0" }}>Panel de administrador</h1>
+    <div className="admin-page-wrapper">
+      <div className="page-backdrop" aria-hidden />
+      <div className="page-admin">
+        <h1 style={{ margin: "16px 0" }}>Panel de administrador</h1>
 
       {/* TABS */}
       <div className="tabs">
@@ -367,7 +369,7 @@ function addSessionFromInput() {
                   <option value="seated">Con asientos (mesas / sillas)</option>
                   <option value="general">Admisión general (solo boletos)</option>
                 </select>
-                <small style={{ color: "#6b7280" }}>
+                <small style={{ color: "#c4b5fd" }}>
                   {form.admissionType === "general"
                     ? "El cliente elige cuántos boletos comprar, sin mapa de asientos."
                     : "El cliente elige asientos en el layout del salón."}
@@ -554,14 +556,15 @@ function addSessionFromInput() {
 
             {(imageFile || form.imageUrl) && (
               <div style={{ marginTop: 8 }}>
-                <small>Preview:</small>
+                <small style={{ color: "#c4b5fd" }}>Preview:</small>
                 <div
                   style={{
                     width: 320,
                     height: 180,
                     overflow: "hidden",
                     borderRadius: 8,
-                    border: "1px solid #e6e8ef",
+                    border: "1px solid rgba(255, 255, 255, 0.15)",
+                    background: "rgba(0, 0, 0, 0.25)",
                   }}
                 >
                   <img
@@ -578,43 +581,49 @@ function addSessionFromInput() {
             <div
               style={{
                 marginTop: 16,
-                /*padding: 12,
-                borderRadius: 10,
-                border: "1px solid #e5e7eb",
-                background: "#f9fafb",*/
+                padding: 14,
+                borderRadius: 12,
+                border: "1px solid rgba(168, 85, 247, 0.3)",
+                background: "rgba(124, 58, 237, 0.12)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <strong>Layout del salón</strong>
-                <span style={{ fontSize: 12, color: "#6b7280" }}>
-                  Selecciona las mesas que NO se podrán vender para este evento.
+                <strong style={{ color: "#f3effd" }}>Layout del salón</strong>
+                <span style={{ fontSize: 12, color: "#c4b5fd" }}>
+                  Selecciona las mesas y sillas que NO se podrán vender para este evento.
                 </span>
               </div>
-              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <button
                   type="button"
-                  className="btn-secondary"
+                  className="btn-layout"
                   onClick={() => setShowLayoutModal(true)}
                 >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+                    <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+                    <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+                    <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+                  </svg>
                   Configurar layout (mesas y sillas)
                 </button>
                 {form.disabledTables && form.disabledTables.length > 0 ? (
-                  <small style={{ color: "#374151" }}>
+                  <small style={{ color: "#e9d5ff", fontWeight: 600 }}>
                     Mesas deshabilitadas:{" "}
                     <strong>{form.disabledTables.join(", ")}</strong>
                   </small>
                 ) : (
-                  <small style={{ color: "#6b7280" }}>
+                  <small style={{ color: "#c4b5fd" }}>
                     No hay mesas deshabilitadas.
                   </small>
                 )}
                 
                 {form.disabledSeats && form.disabledSeats.length > 0 ? (
-                  <small style={{ color: "#374151" }}>
+                  <small style={{ color: "#e9d5ff", fontWeight: 600 }}>
                     Sillas deshabilitadas: <strong>{form.disabledSeats.length}</strong>
                   </small>
                 ) : (
-                  <small style={{ color: "#6b7280" }}>No hay sillas deshabilitadas.</small>
+                  <small style={{ color: "#c4b5fd" }}>No hay sillas deshabilitadas.</small>
                 )}
               </div>
             </div>
@@ -747,8 +756,11 @@ function addSessionFromInput() {
                         <td>
                           <button
                             onClick={() => togglePublish(ev)}
-                            className="btn-secondary"
-                            style={{ padding: "6px 10px" }}
+                            className={`btn-status ${
+                              ev.status === "published"
+                                ? "btn-status--published"
+                                : "btn-status--draft"
+                            }`}
                           >
                             {ev.status === "published"
                               ? "Publicado"
@@ -770,7 +782,7 @@ function addSessionFromInput() {
                         >
                           <button
                             onClick={() => onEdit(ev)}
-                            className="btn-secondary"
+                            className="btn-edit"
                           >
                             Editar
                           </button>{" "}
@@ -804,6 +816,7 @@ function addSessionFromInput() {
       ) : (
         <SalesTab events={events} />
       )}
+      </div>
     </div>
   );
 }
@@ -1123,7 +1136,7 @@ function SalesTab({ events }: { events: EventItem[] }) {
                 <td>
                   {r.userEmail || "-"}
                   {r.userPhone ? (
-                    <div style={{ color: "#666" }}>{r.userPhone}</div>
+                    <div style={{ color: "#c4b5fd" }}>{r.userPhone}</div>
                   ) : null}
                 </td>
                 <td>{r.orderId || "-"}</td>
@@ -1278,10 +1291,10 @@ const toggleSeat = (tableId: string, seatId: string) => {
     >
       <div
         style={{
-          background: "#0b1220",
+          background: "#120c24",
           color: "#e5e7eb",
           borderRadius: 14,
-          border: "1px solid #1f2937",
+          border: "1px solid rgba(168, 85, 247, 0.3)",
           maxWidth: "1000px",
           width: "100%",
           maxHeight: "80vh",
@@ -1313,11 +1326,12 @@ const toggleSeat = (tableId: string, seatId: string) => {
               type="button"
               onClick={() => setMode("tables")}
               style={{
-                padding: "6px 10px",
+                padding: "6px 14px",
                 borderRadius: 999,
-                border: "1px solid #374151",
-                background: mode === "tables" ? "#22c55e" : "#111827",
-                color: mode === "tables" ? "#0b1120" : "#e5e7eb",
+                border: "1px solid",
+                borderColor: mode === "tables" ? "transparent" : "#334155",
+                background: mode === "tables" ? "linear-gradient(135deg, #7c3aed, #9333ea)" : "#1e293b",
+                color: mode === "tables" ? "#ffffff" : "#cbd5e1",
                 cursor: "pointer",
                 fontWeight: 700,
                 fontSize: 12,
@@ -1330,11 +1344,12 @@ const toggleSeat = (tableId: string, seatId: string) => {
               type="button"
               onClick={() => setMode("seats")}
               style={{
-                padding: "6px 10px",
+                padding: "6px 14px",
                 borderRadius: 999,
-                border: "1px solid #374151",
-                background: mode === "seats" ? "#22c55e" : "#111827",
-                color: mode === "seats" ? "#0b1120" : "#e5e7eb",
+                border: "1px solid",
+                borderColor: mode === "seats" ? "transparent" : "#334155",
+                background: mode === "seats" ? "linear-gradient(135deg, #7c3aed, #9333ea)" : "#1e293b",
+                color: mode === "seats" ? "#ffffff" : "#cbd5e1",
                 cursor: "pointer",
                 fontWeight: 700,
                 fontSize: 12,
@@ -1350,11 +1365,13 @@ const toggleSeat = (tableId: string, seatId: string) => {
             style={{
               marginLeft: "auto",
               borderRadius: 999,
-              padding: "4px 10px",
-              border: "1px solid #374151",
-              background: "#111827",
-              color: "#e5e7eb",
+              padding: "5px 12px",
+              border: "1px solid #334155",
+              background: "#1e293b",
+              color: "#cbd5e1",
               cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
             }}
           >
             Cerrar ✕
@@ -1376,7 +1393,7 @@ const toggleSeat = (tableId: string, seatId: string) => {
             {/* Mesas */}
             {tables.map((t) => {
               const isTableDisabled = localDisabledTables.has(t.id);
-              const strokeBase = t.zoneId === "VIP" ? "#1e62ff" : "#d4af37";
+              const strokeBase = t.zoneId === "VIP" ? "#7c3aed" : "#d4af37";
 
               return (
                 <g key={t.id}>
@@ -1392,7 +1409,7 @@ const toggleSeat = (tableId: string, seatId: string) => {
                       height={TABLE_H_MODAL}
                       rx={TABLE_R_MODAL}
                       ry={TABLE_R_MODAL}
-                      fill={isTableDisabled ? "#111827" : "#e9eef7"}
+                      fill={isTableDisabled ? "#1a102f" : "#24183d"}
                       stroke={isTableDisabled ? "#ef4444" : strokeBase}
                       strokeWidth={isTableDisabled ? 6 : 3}
                       opacity={isTableDisabled ? 0.75 : 1}
@@ -1402,7 +1419,7 @@ const toggleSeat = (tableId: string, seatId: string) => {
                       y={t.cy + 10}
                       fontSize={30 * TABLE_SCALE}
                       textAnchor="middle"
-                      fill={isTableDisabled ? "#fca5a5" : "#334155"}
+                      fill={isTableDisabled ? "#fca5a5" : "#f3effd"}
                       style={{ pointerEvents: "none", fontWeight: 900, letterSpacing: 0.6 }}
                     >
                       {t.label}
@@ -1485,11 +1502,12 @@ const toggleSeat = (tableId: string, seatId: string) => {
                 else setLocalDisabledSeats(new Set());
               }}
               style={{
-                padding: "6px 12px",
+                padding: "8px 16px",
                 borderRadius: 8,
-                border: "1px solid #4b5563",
-                background: "#111827",
-                color: "#e5e7eb",
+                border: "1px solid #334155",
+                background: "#1e293b",
+                color: "#cbd5e1",
+                fontWeight: 600,
                 cursor: "pointer",
               }}
             >
@@ -1498,13 +1516,14 @@ const toggleSeat = (tableId: string, seatId: string) => {
             <button
               onClick={handleSave}
               style={{
-                padding: "8px 16px",
+                padding: "8px 18px",
                 borderRadius: 8,
                 border: "none",
-                background: "#22c55e",
-                color: "#0b1120",
+                background: "linear-gradient(135deg, #7c3aed, #9333ea)",
+                color: "#ffffff",
                 fontWeight: 700,
                 cursor: "pointer",
+                boxShadow: "0 2px 10px rgba(124, 58, 237, 0.4)",
               }}
             >
               Guardar layout

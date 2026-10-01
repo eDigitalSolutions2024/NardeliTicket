@@ -1,164 +1,339 @@
 /* ============================================================
-   NardeliTicket · Carrusel hero (cinemático)
+   NardeliTicket · Carrusel (Imagen principal visible + Texto destacado)
    ============================================================ */
-.carousel {
+
+.cf {
   position: relative;
   width: 100%;
-  height: var(--carousel-h, 480px);
+  height: var(--carousel-h, 580px);
   overflow: hidden;
-  background: #060f1a;
+  background: radial-gradient(1100px 460px at 50% 120%, rgba(124, 58, 237, 0.15), transparent 60%);
   isolation: isolate;
+  user-select: none;
 }
 
-.carousel__slide {
+.cf__stage {
   position: absolute;
   inset: 0;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 900ms var(--ease);
-}
-.carousel__slide.is-active {
-  opacity: 1;
-  visibility: visible;
-  z-index: 1;
+  perspective: 1400px;
+  transform-style: preserve-3d;
 }
 
-.carousel__img {
+/* ============================================================
+   Tarjetas del Carrusel
+   ============================================================ */
+.cf__card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: calc(var(--carousel-h, 580px) - 24px);
+  border-radius: 24px;
+  overflow: hidden;
+  background: #0d0820;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transform-origin: center center;
+  transition:
+    transform 620ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 620ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 620ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 620ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 620ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform, opacity, filter;
+}
+
+/* Imagen en tarjeta */
+.cf__img {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  will-change: transform;
-}
-/* Fondo: misma imagen difuminada y oscurecida que rellena el banner */
-.carousel__img--blur {
   object-fit: cover;
-  transform: scale(1.2);
-  filter: blur(30px) brightness(0.45) saturate(1.15);
-  z-index: 0;
-}
-/* Imagen completa (sin recortes), alineada a la derecha para dejar el texto a la izquierda */
-.carousel__img--full {
-  object-fit: contain;
-  object-position: center right;
-  padding: 24px clamp(16px, 5vw, 90px) 24px 0;
   z-index: 1;
-  transform: scale(1.02);
-}
-.carousel__slide.is-active .carousel__img--full {
-  animation: kenburns 9s ease-out forwards;
-}
-@keyframes kenburns {
-  from { transform: scale(1.07); }
-  to { transform: scale(1.0); }
+  display: block;
+  user-select: none;
+  pointer-events: none;
+  transition: filter 620ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Degradados para legibilidad */
-.carousel__scrim {
+/* Tarjeta Central: Imagen nítida, brillante y protagonista con borde blanco delimitado */
+.cf__card.is-center {
+  cursor: default;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 30px 70px rgba(0, 0, 0, 0.75),
+    0 0 40px rgba(255, 255, 255, 0.22),
+    0 0 60px rgba(124, 58, 237, 0.30);
+}
+.cf__card.is-center .cf__img {
+  filter: brightness(0.96) contrast(1.04);
+}
+.cf__card.is-center .cf__card-scrim {
   position: absolute;
   inset: 0;
-  background:
-    linear-gradient(90deg, rgba(4, 10, 18, 0.9) 0%, rgba(4, 10, 18, 0.5) 34%, rgba(4, 10, 18, 0) 64%),
-    linear-gradient(0deg, rgba(4, 10, 18, 0.85) 0%, rgba(4, 10, 18, 0.1) 42%, transparent 70%);
-  z-index: 1;
+  z-index: 2;
+  pointer-events: none;
+  /* Sutil degradado solo en la base inferior para fundir suavemente con el fondo */
+  background: linear-gradient(180deg, transparent 55%, rgba(10, 6, 24, 0.45) 100%);
 }
 
-/* Caption */
-.carousel__caption {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  z-index: 2;
-  max-width: min(720px, 64%);
-  padding: 0 clamp(24px, 5vw, 80px) clamp(40px, 6vw, 80px);
-  color: #fff;
+/* Tarjetas Laterales: En penumbra y desenfocadas para profundidad */
+.cf__card.is-lateral .cf__img {
+  filter: brightness(0.36) saturate(0.75) blur(1.5px);
 }
-.carousel__eyebrow {
+.cf__card.is-lateral:hover .cf__img {
+  filter: brightness(0.50) saturate(0.9) blur(0.5px);
+}
+.cf__card.is-lateral .cf__card-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: rgba(10, 6, 24, 0.45);
+  transition: background 0.3s ease;
+}
+.cf__card.is-lateral:hover .cf__card-scrim {
+  background: rgba(10, 6, 24, 0.2);
+}
+
+/* ============================================================
+   Velo suave en el cuadrante inferior-izquierdo
+   (Deja el 80% superior y derecho de la imagen totalmente brillante)
+   ============================================================ */
+.cf__stage-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 28;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 80% 70% at 15% 100%, rgba(9, 5, 22, 0.88) 0%, rgba(9, 5, 22, 0.45) 52%, transparent 80%),
+    linear-gradient(0deg, rgba(9, 5, 22, 0.75) 0%, transparent 40%);
+}
+
+/* ============================================================
+   Información del evento activo (SUPER DESTACABLE, FUERA DE LAS TARJETAS)
+   ============================================================ */
+.cf__foreground-content {
+  position: absolute;
+  left: clamp(60px, 12vw, 160px);
+  bottom: clamp(32px, 5.5vw, 64px);
+  z-index: 35;
+  pointer-events: auto;
+  max-width: min(720px, 82%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  box-sizing: border-box;
+}
+
+.cf__foreground-content > * {
+  opacity: 0;
+  animation: cfForegroundFadeIn 450ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.cf__foreground-content > *:nth-child(1) { animation-delay: 50ms; }
+.cf__foreground-content > *:nth-child(2) { animation-delay: 110ms; }
+.cf__foreground-content > *:nth-child(3) { animation-delay: 170ms; }
+.cf__foreground-content > *:nth-child(4) { animation-delay: 230ms; }
+
+@keyframes cfForegroundFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 1. Badge "✦ EVENTO DESTACADO" */
+.cf__badge {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.74rem;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #c4b5fd;
-  background: rgba(139, 92, 246, 0.16);
-  border: 1px solid rgba(125, 211, 252, 0.35);
-  padding: 6px 14px;
+  padding: 8px 18px;
   border-radius: 999px;
-  margin-bottom: 16px;
-  backdrop-filter: blur(6px);
-}
-.carousel__title {
-  font-family: var(--font-display);
+  background: rgba(124, 58, 237, 0.38);
+  border: 1px solid rgba(168, 85, 247, 0.7);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: 0.80rem;
   font-weight: 800;
-  font-size: clamp(2rem, 4.4vw, 3.6rem);
-  line-height: 1.02;
-  letter-spacing: -0.02em;
-  margin: 0 0 12px;
-  text-shadow: 0 6px 30px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #ffffff;
+  margin-bottom: 16px;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.45);
 }
-.carousel__subtitle {
-  font-size: clamp(0.98rem, 1.5vw, 1.25rem);
-  color: rgba(238, 247, 253, 0.9);
-  margin: 0 0 22px;
-  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
-  max-width: 560px;
+.cf__badge-star {
+  color: #c084fc;
+  font-size: 0.95rem;
+  line-height: 1;
 }
-.carousel__cta {
+
+/* 2. Título Hero (Super destacado, imponente y legible) */
+.cf__title {
+  font-family: var(--font-display, "Sora", sans-serif);
+  font-weight: 800;
+  font-size: clamp(2.4rem, 4.4vw, 3.85rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: #ffffff;
+  margin: 0 0 18px 0;
+  text-shadow:
+    0 4px 26px rgba(0, 0, 0, 0.96),
+    0 2px 8px rgba(0, 0, 0, 0.95),
+    0 0 50px rgba(0, 0, 0, 0.7);
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* 3. Ubicación (Píldora frosted amplia y destacada) */
+.cf__location {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 28px 0;
+  padding: 9px 20px;
+  border-radius: 14px;
+  background: rgba(14, 9, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-size: clamp(1.02rem, 1.35vw, 1.2rem);
+  line-height: 1.4;
+  font-weight: 600;
+  color: #f3effe;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.cf__pin {
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.cf__location-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 4. Botón "Ver evento →" (Llamativo, moderno y premium) */
+.cf__actions {
+  margin-top: 2px;
+}
+.cf__btn-hero {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  height: 54px;
+  padding: 0 36px;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #120a24;
+  font-family: var(--font-sans, "Inter", sans-serif);
+  font-weight: 800;
+  font-size: 1.05rem;
   text-decoration: none;
+  cursor: pointer;
+  box-shadow:
+    0 8px 26px rgba(0, 0, 0, 0.52),
+    0 0 30px rgba(255, 255, 255, 0.38);
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.2s ease,
+    color 0.2s ease;
+}
+.cf__btn-hero:hover {
+  transform: translateY(-2px) scale(1.03);
+  background: #faf7ff;
+  color: #0b0518;
+  box-shadow:
+    0 14px 42px rgba(0, 0, 0, 0.65),
+    0 0 42px rgba(168, 85, 247, 0.6);
+}
+.cf__btn-hero:active {
+  transform: translateY(0) scale(0.98);
+}
+.cf__btn-arrow {
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform 0.2s ease;
+}
+.cf__btn-hero:hover .cf__btn-arrow {
+  transform: translateX(4px);
 }
 
-/* Animación de entrada del caption (escalonada) */
-.carousel__slide.is-active .carousel__caption > * {
-  opacity: 0;
-  animation: capIn 760ms var(--ease) forwards;
-}
-.carousel__slide.is-active .carousel__caption > *:nth-child(1) { animation-delay: 220ms; }
-.carousel__slide.is-active .carousel__caption > *:nth-child(2) { animation-delay: 340ms; }
-.carousel__slide.is-active .carousel__caption > *:nth-child(3) { animation-delay: 460ms; }
-.carousel__slide.is-active .carousel__caption > *:nth-child(4) { animation-delay: 580ms; }
-@keyframes capIn {
-  from { opacity: 0; transform: translateY(22px); }
-  to { opacity: 1; transform: translateY(0); }
+/* ============================================================
+   Estado vacío
+   ============================================================ */
+.cf__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #fff;
+  text-align: center;
+  padding: 24px;
 }
 
-/* Flechas */
+/* ============================================================
+   Controles: Flechas y Dots
+   ============================================================ */
 .carousel__nav {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 3;
-  width: 54px;
-  height: 54px;
+  z-index: 40;
+  width: 52px;
+  height: 52px;
   display: grid;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: 999px;
-  background: rgba(6, 15, 26, 0.4);
-  color: #fff;
+  background: rgba(18, 12, 36, 0.65);
+  color: #ffffff;
   cursor: pointer;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  transition: background var(--dur-2) var(--ease), transform var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    background var(--dur-2, 0.2s) var(--ease, ease),
+    transform var(--dur-2, 0.2s) var(--ease, ease),
+    border-color var(--dur-2, 0.2s) var(--ease, ease),
+    color var(--dur-2, 0.2s) var(--ease, ease);
 }
 .carousel__nav:hover {
-  background: var(--grad-brand);
+  background: #ffffff;
+  color: #120a24;
   border-color: transparent;
   transform: translateY(-50%) scale(1.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), 0 0 20px rgba(255, 255, 255, 0.3);
 }
-.carousel__nav--prev { left: clamp(14px, 2.5vw, 34px); }
-.carousel__nav--next { right: clamp(14px, 2.5vw, 34px); }
+.carousel__nav--prev { left: clamp(14px, 3.5vw, 44px); }
+.carousel__nav--next { right: clamp(14px, 3.5vw, 44px); }
 .carousel__nav svg { width: 24px; height: 24px; }
 
-/* Dots */
 .carousel__dots {
   position: absolute;
-  z-index: 3;
-  right: clamp(24px, 5vw, 80px);
-  bottom: clamp(40px, 6vw, 80px);
+  z-index: 40;
+  right: clamp(20px, 4vw, 44px);
+  bottom: clamp(20px, 3.5vw, 36px);
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 .carousel__dot {
   width: 10px;
@@ -168,45 +343,60 @@
   background: rgba(255, 255, 255, 0.4);
   cursor: pointer;
   padding: 0;
-  transition: background var(--dur-2) var(--ease), width var(--dur-2) var(--ease);
+  transition: background var(--dur-2, 0.2s) var(--ease, ease), width var(--dur-2, 0.2s) var(--ease, ease);
+}
+.carousel__dot:hover {
+  background: rgba(255, 255, 255, 0.7);
 }
 .carousel__dot.is-active {
-  width: 30px;
-  background: var(--grad-brand);
+  width: 28px;
+  background: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
-/* Barra de progreso */
-.carousel__progress {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  right: 0;
-  height: 4px;
-  z-index: 3;
-  background: rgba(255, 255, 255, 0.12);
-}
-.carousel__progress span {
-  display: block;
-  height: 100%;
-  width: 0;
-  background: var(--grad-brand);
-  animation: carouselProgress linear forwards;
-}
-@keyframes carouselProgress {
-  from { width: 0; }
-  to { width: 100%; }
-}
-
-@media (max-width: 768px) {
-  .carousel { height: clamp(360px, 62vh, 520px); }
-  .carousel__caption { max-width: 92%; }
-  .carousel__img--full { object-position: center top; padding: 10px 10px 120px; }
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 900px) {
+  .cf { height: clamp(420px, 58vh, 500px); }
+  .cf__card { height: calc(clamp(420px, 58vh, 500px) - 30px); border-radius: 20px; }
+  .cf__foreground-content { max-width: 90%; left: clamp(36px, 8vw, 90px); bottom: 28px; }
   .carousel__nav { width: 44px; height: 44px; }
-  .carousel__dots { bottom: 22px; right: 20px; }
+}
+
+@media (max-width: 640px) {
+  .cf { height: clamp(400px, 66vh, 480px); }
+  .cf__card { height: calc(clamp(400px, 66vh, 480px) - 22px); border-radius: 18px; }
+  .cf__foreground-content {
+    max-width: 100%;
+    left: 20px;
+    right: 20px;
+    bottom: 20px;
+  }
+  .cf__title {
+    font-size: clamp(1.45rem, 5.5vw, 1.85rem);
+    margin-bottom: 10px;
+  }
+  .cf__location {
+    font-size: 0.86rem;
+    margin-bottom: 16px;
+    padding: 6px 12px;
+  }
+  .cf__btn-hero {
+    height: 44px;
+    padding: 0 24px;
+    font-size: 0.92rem;
+  }
+  .carousel__nav { width: 38px; height: 38px; }
+  .carousel__nav--prev { left: 8px; }
+  .carousel__nav--next { right: 8px; }
+  .carousel__dots {
+    right: 16px;
+    bottom: 14px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .carousel__slide.is-active .carousel__img { animation: none; transform: scale(1.02); }
-  .carousel__slide.is-active .carousel__caption > * { animation: none; opacity: 1; }
-  .carousel__progress span { animation: none; }
+  .cf__card { transition: none; }
+  .cf__foreground-content > * { animation: none; opacity: 1; }
 }

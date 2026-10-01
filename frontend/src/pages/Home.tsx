@@ -1,20 +1,12 @@
 // src/pages/Home.tsx
 import  { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import SimpleCarousel, { type Slide } from "../components/SimpleCarousel";
 import type { EventItem } from "../types/Event";
 import EventTile from "../components/EventTile";
 import WebGLParticles from "../components/WebGLParticles";
 import { fetchEvents } from "../api/events";
+import salonImg from "../assets/salon.jpg";
 import "../CSS/Home.css";
-
-const CATEGORIES = [
-  { key: "Conciertos", icon: "🎤", c1: "#7c3aed", c2: "#a855f7" },
-  { key: "Teatro", icon: "🎭", c1: "#9333ea", c2: "#c084fc" },
-  { key: "Deportes", icon: "⚽", c1: "#6d28d9", c2: "#8b5cf6" },
-  { key: "Familiares", icon: "🎈", c1: "#a21caf", c2: "#d946ef" },
-  { key: "Especiales", icon: "✨", c1: "#7c3aed", c2: "#ec4899" },
-];
 
 // Slides estáticos
 {/*const staticSlides: Slide[] = [
@@ -108,103 +100,61 @@ export default function Home() {
     <main className="home u-container">
       {/* Fondo azul oscuro a pantalla completa (como el splash) */}
       <div className="page-backdrop" aria-hidden />
-      <WebGLParticles className="home__particles" ambient={0.5} />
+      <WebGLParticles className="home__particles" ambient={0.35} />
 
       {/* HERO mejorado con overlay */}
     <div className="home__hero enhanced-hero">
       <div className="enhanced-hero__bg-blur" aria-hidden />
 
       {/* Carrusel */}
-      <SimpleCarousel slides={heroSlides} height={460} />
+      <SimpleCarousel slides={heroSlides} height={580} />
+    </div>
 
-      {/* Stats flotando arriba */}
-      <div className="enhanced-hero__stats top">
-        <div className="stat">
-          <span className="num">{upcoming.length}</span>
-          <span className="txt">Eventos activos</span>
-        </div>
-        <div className="stat">
-          <span className="num">100%</span>
-          <span className="txt">Pagos seguros</span>
-        </div>
-        <div className="stat">
-          <span className="num">24/7</span>
-          <span className="txt">Soporte</span>
-        </div>
+
+
+{/* Próximos eventos + publicidad del salón */}
+<section className="home__section home__layout">
+  <div className="home__main">
+    <div className="events__header">
+      <h2>Próximos eventos</h2>
+    </div>
+
+    {loading ? (
+      <div className="events__grid">
+        {Array.from({ length: 6 }).map((_, i) => <div key={i} className="card-skeleton" />)}
       </div>
-    </div>
-
-
-      {/* Categorías */}
-      <section className="home__section home__section--cats">
-        <div className="events__header">
-          <h2>Explora por categoría</h2>
-        </div>
-        <div className="tm-cats">
-          {CATEGORIES.map((c) => (
-            <Link
-              key={c.key}
-              to={`/events?category=${encodeURIComponent(c.key)}`}
-              className="tm-cat"
-              style={{ ["--c1" as any]: c.c1, ["--c2" as any]: c.c2 }}
-            >
-              <span className="tm-cat__icon" aria-hidden>{c.icon}</span>
-              <span className="tm-cat__label">{c.key}</span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-{/* Próximos eventos */}
-<section className="home__section">
-  <div className="events__header u-flex-between">
-    <h2>Próximos eventos</h2>
-    <div className="events__tools">
-      <span className="events__count">{upcoming.length} eventos</span>
-      <select
-        className="events__sort"
-        onChange={(e) => {
-          const v = e.target.value;
-          if (v === "soon") {
-            // ya vienen ordenados por fecha cercana 👍
-            return;
-          }
-          if (v === "new") {
-            const byCreated = [...upcoming].sort(
-              (a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime()
-            );
-            setEvents((prev) => {
-              // mantenemos el resto de estado pero mostramos “byCreated” en lugar de upcoming
-              const ids = new Set(byCreated.map((x) => x.id));
-              return [...prev].sort((a, b) => (ids.has(a.id) && ids.has(b.id)
-                ? byCreated.findIndex(x => x.id === a.id) - byCreated.findIndex(x => x.id === b.id)
-                : 0));
-            });
-          }
-        }}
-        defaultValue="soon"
-      >
-        <option value="soon">Más cercanos</option>
-        <option value="new">Recientes</option>
-      </select>
-      <a className="link-quiet" href="/events">Ver todos</a>
-    </div>
+    ) : upcoming.length === 0 ? (
+      <p className="u-mt-16 muted">No hay eventos publicados por ahora.</p>
+    ) : (
+      <div className="tm-grid">
+        {upcoming.map((ev) => (
+          <EventTile key={ev.id} ev={ev} />
+        ))}
+      </div>
+    )}
   </div>
 
-  {loading ? (
-    <div className="events__grid">
-      {Array.from({ length: 6 }).map((_, i) => <div key={i} className="card-skeleton" />)}
-    </div>
-  ) : upcoming.length === 0 ? (
-    <p className="u-mt-16 muted">No hay eventos publicados por ahora.</p>
-  ) : (
-    <div className="tm-grid">
-      {upcoming.map((ev) => (
-        <EventTile key={ev.id} ev={ev} />
-      ))}
-    </div>
-  )}
+  
 </section>
+
+{/* Columna de publicidad del salón */}
+  <aside className="salon-ad" aria-label="Salón Nardeli">
+    <img className="salon-ad__img" src={salonImg} alt="Salón de eventos Nardeli" />
+    <div className="salon-ad__scrim" />
+    <div className="salon-ad__body">
+      <span className="salon-ad__tag">Salón de eventos</span>
+      <h3 className="salon-ad__title">Haz tu evento en Nardeli</h3>
+      <p className="salon-ad__text">
+        Bodas, XV años, conciertos y celebraciones en un espacio único.
+      </p>
+      <ul className="salon-ad__list">
+        <li>Capacidad para tus invitados</li>
+        <li>Iluminación y sonido profesional</li>
+        <li>Atención personalizada</li>
+      </ul>
+      <a className="btn btn-primary salon-ad__cta" href="/events">Cotizar mi evento</a>
+    </div>
+  </aside>
 
 
       {/* CTA final */}

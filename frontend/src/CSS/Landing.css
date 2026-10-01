@@ -61,7 +61,7 @@
   width: 40px;
   height: 40px;
   border-radius: 999px;
-  background: radial-gradient(circle, rgba(125, 211, 252, 0.9), rgba(139, 92, 246, 0.4) 40%, transparent 70%);
+  background: radial-gradient(circle, rgba(125, 211, 252, 0.9), rgba(255, 255, 255, 0.4) 40%, transparent 70%);
   transform: translate(-50%, -50%) scale(1);
   animation: flashOut 620ms var(--ease) forwards;
   pointer-events: none;
@@ -105,7 +105,7 @@
   letter-spacing: -0.03em;
   margin: 0;
   color: #f4fbff;
-  text-shadow: 0 8px 40px rgba(139, 92, 246, 0.35);
+  text-shadow: 0 8px 40px rgba(255, 255, 255, 0.35);
   display: inline-flex;
   align-items: center;
   gap: 0.12em;
@@ -122,7 +122,7 @@
   50% { transform: translateY(-8px); }
 }
 .landing__brand-accent {
-  background: linear-gradient(120deg, #c4b5fd, #8b5cf6 55%, #a855f7);
+  background: linear-gradient(120deg, #ffffff, #f2f0fa 55%, #e6e3f2);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -133,7 +133,7 @@
   font-style: italic;
   font-weight: 600;
   font-size: clamp(1rem, 2.4vw, 1.5rem);
-  color: #a855f7;
+  color: #e6e3f2;
   letter-spacing: 0.02em;
   margin: 6px 0 34px;
 }
@@ -151,11 +151,11 @@
   font-weight: 800;
   font-size: 1.08rem;
   color: #04121f;
-  background: linear-gradient(120deg, #c4b5fd, #8b5cf6 55%, #a855f7);
+  background: linear-gradient(120deg, #ffffff, #f2f0fa 55%, #e6e3f2);
   background-size: 200% 100%;
   cursor: pointer;
   overflow: hidden;
-  box-shadow: 0 12px 40px rgba(139, 92, 246, 0.45);
+  box-shadow: 0 12px 40px rgba(255, 255, 255, 0.45);
   animation: ctaPulse 2.6s var(--ease) infinite;
   transition: transform var(--dur-2) var(--ease), box-shadow var(--dur-2) var(--ease);
 }
@@ -185,7 +185,7 @@
 .landing__cta:active { transform: translateY(-1px) scale(1); }
 
 @keyframes ctaPulse {
-  0%, 100% { box-shadow: 0 12px 40px rgba(139, 92, 246, 0.45); }
+  0%, 100% { box-shadow: 0 12px 40px rgba(255, 255, 255, 0.45); }
   50% { box-shadow: 0 12px 55px rgba(56, 189, 248, 0.75); }
 }
 @keyframes ctaShine {

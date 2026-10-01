@@ -6,10 +6,22 @@
   top: 0;
   z-index: 100;
   width: 100%;
-  background: rgba(7, 20, 34, 0.78);
-  backdrop-filter: saturate(180%) blur(18px);
-  -webkit-backdrop-filter: saturate(180%) blur(18px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(23, 14, 46, 0.92), rgba(15, 10, 30, 0.88));
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.4);
+}
+/* Línea de acento sutil */
+.nv::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  opacity: 0.6;
 }
 
 .nv__inner {
@@ -54,7 +66,7 @@
   height: 30px;
   width: auto;
   display: block;
-  filter: drop-shadow(0 3px 10px rgba(147, 51, 234, 0.45));
+  filter: drop-shadow(0 3px 10px rgba(124, 58, 237, 0.45));
 }
 
 .nv__links {
@@ -106,7 +118,7 @@
 }
 .nv__search:focus-within {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.18);
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.25);
 }
 .nv__search input {
   flex: 1;
@@ -252,7 +264,7 @@
 .nv__menu a:hover,
 .nv__menu button:hover {
   background: rgba(255, 255, 255, 0.08);
-  color: #c4b5fd;
+  color: #7dd3fc;
 }
 
 /* ============================================================
@@ -296,3 +308,8 @@
   .nv__login { display: none; }
   .nv__login-icon { display: inline-flex; }
 }
+
+/* Acentos blancos: texto oscuro sobre fondos blancos */
+.nv__badge, .nv__login, .nv__avatar { color: var(--on-brand); }
+.nv__login:hover { color: var(--on-brand); }
+.nv__search button { color: var(--on-brand); }

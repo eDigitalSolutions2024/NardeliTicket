@@ -25,9 +25,11 @@
   --color-on-dark-muted: #b9afd6;
 
   /* ===== Gradients ===== */
-  --grad-brand: linear-gradient(120deg, #6d28d9 0%, #9333ea 55%, #a855f7 115%);
-  --grad-brand-soft: linear-gradient(120deg, rgba(139, 92, 246, 0.16), rgba(147, 51, 234, 0.14));
-  --grad-text: linear-gradient(120deg, #c4b5fd, #a855f7 55%, #d8b4fe);
+  /* Acento BLANCO que hace juego con el fondo morado */
+  --grad-brand: linear-gradient(120deg, #ffffff 0%, #eef1f8 60%, #ffffff 115%);
+  --on-brand: #1a1229; /* texto sobre elementos blancos */
+  --grad-brand-soft: linear-gradient(120deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.1));
+  --grad-text: linear-gradient(120deg, #ffffff, #e6e3f2 55%, #ffffff);
 
   /* ===== Typography ===== */
   --font-display: "Sora", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -53,8 +55,8 @@
   --shadow-1: 0 1px 2px rgba(22, 19, 31, 0.06), 0 2px 8px rgba(22, 19, 31, 0.06);
   --shadow-2: 0 10px 30px rgba(22, 19, 31, 0.12);
   --shadow-3: 0 24px 60px rgba(22, 19, 31, 0.18);
-  --shadow-brand: 0 10px 30px rgba(124, 58, 237, 0.4);
-  --shadow-glow: 0 0 0 1px rgba(139, 92, 246, 0.28), 0 12px 40px rgba(147, 51, 234, 0.35);
+  --shadow-brand: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --shadow-glow: 0 0 0 1px rgba(255, 255, 255, 0.5), 0 14px 44px rgba(255, 255, 255, 0.18);
 
   /* ===== Motion ===== */
   --ease: cubic-bezier(0.22, 0.61, 0.28, 1);

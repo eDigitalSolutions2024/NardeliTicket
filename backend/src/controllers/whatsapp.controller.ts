@@ -14,19 +14,12 @@ import {
 } from "../services/whatsapp";
 
 /** Normaliza una base pública para construir URLs de fallback (enlace). */
-const RAW_API_BASE = (process.env.PUBLIC_API_BASE_URL || "").trim();
-const API_ROOT = RAW_API_BASE
-  ? (() => {
-      const base = RAW_API_BASE.replace(/\/+$/, "");
-      return /\/api$/.test(base) ? base : `${base}/api`;
-    })()
-  : "";
+// BACKEND_URL: URL del servidor Express (donde están los archivos estáticos)
+const RAW_BACKEND = (process.env.BACKEND_URL || process.env.PUBLIC_API_BASE_URL || "").trim();
 
 function buildTicketPdfUrl(req: Request, ticketId: string) {
-  if (API_ROOT) return `${API_ROOT}/checkout/tickets/${ticketId}.pdf`;
-  const proto = (req.headers["x-forwarded-proto"] as string) || "http";
-  const host = (req.headers.host || "").replace(/\/+$/, "");
-  return `${proto}://${host}/api/checkout/tickets/${ticketId}.pdf`;
+  const base = RAW_BACKEND || `${(req.headers["x-forwarded-proto"] as string) || "http"}://${(req.headers.host || "").replace(/\/+$/, "")}`;
+  return `${base}/files/tickets/${ticketId}.pdf`;
 }
 
 /** Resuelve {order, seat} para un ticketId dado. Sirve si aún no existe el PDF. */

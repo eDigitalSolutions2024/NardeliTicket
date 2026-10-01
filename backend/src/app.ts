@@ -17,11 +17,14 @@ const app = express();
 // 👇 añade esta línea
 app.set("trust proxy", 1);
 
-/** 1) CORS con credenciales y origin explícito (usa FRONTEND_URL si la tienes) */
-const FRONT = process.env.FRONTEND_URL || process.env.PUBLIC_URL || "http://localhost:5173";
+/** 1) CORS — origen del frontend (separado de PUBLIC_URL que es del backend) */
+const FRONT =
+  process.env.FRONTEND_URL ||
+  "http://localhost:5173";
+
 app.use(
   cors({
-    origin: [FRONT],
+    origin: [FRONT, "http://localhost:5173", "http://localhost:4173"],
     credentials: true,
   })
 );
@@ -52,8 +55,13 @@ app.use(
   "/files/tickets",
   express.static(path.join(__dirname, "tickets"), {
     setHeaders(res, filePath) {
-      if (filePath.endsWith(".pdf")) res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      if (filePath.endsWith(".pdf")) {
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Content-Disposition", 'inline; filename="boletos.pdf"');
+      }
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+      res.setHeader("Cache-Control", "public, max-age=3600");
     },
   })
 );

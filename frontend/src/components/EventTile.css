@@ -91,7 +91,7 @@
 .tile__meta {
   font-size: 0.74rem;
   font-weight: 600;
-  color: #c4b5fd;
+  color: #7dd3fc;
   letter-spacing: 0.02em;
 }
 .tile__title {
@@ -114,3 +114,7 @@
   color: rgba(255, 255, 255, 0.85);
   text-transform: capitalize;
 }
+
+/* Acento blanco */
+.tile__feat { color: var(--on-brand); }
+.tile__meta { color: rgba(255, 255, 255, 0.8); }

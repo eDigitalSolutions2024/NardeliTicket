@@ -15,8 +15,8 @@
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(600px 340px at 15% 10%, rgba(139, 92, 246, 0.14), transparent 60%),
-    radial-gradient(600px 340px at 85% 90%, rgba(124, 58, 237, 0.12), transparent 60%);
+    radial-gradient(600px 340px at 15% 10%, rgba(14, 165, 233, 0.14), transparent 60%),
+    radial-gradient(600px 340px at 85% 90%, rgba(2, 132, 199, 0.12), transparent 60%);
 }
 
 .auth__card {
@@ -37,14 +37,14 @@
   height: auto;
   margin: 0 auto 6px;
   display: block;
-  filter: drop-shadow(0 6px 16px rgba(147, 51, 234, 0.28));
+  filter: drop-shadow(0 6px 16px rgba(2, 132, 199, 0.28));
 }
 
 .auth__tabs {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
-  background: rgba(139, 92, 246, 0.07);
+  background: rgba(14, 165, 233, 0.07);
   padding: 6px;
   border-radius: 999px;
   margin-bottom: 4px;
@@ -101,3 +101,6 @@
   height: 48px;
   margin-top: 6px;
 }
+
+/* Acento blanco */
+.auth__tab.is-active { color: var(--on-brand); }
